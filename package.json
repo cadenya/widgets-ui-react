@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "description": "React UI kit for embedding Cadenya widgets: conversations, streaming, tool approvals, custom tool renderers. Built on Radix Themes.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cadenya/widgets-ui-react.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,6 +29,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
