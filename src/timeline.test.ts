@@ -136,6 +136,37 @@ describe("tool call lifecycle folding", () => {
   });
 });
 
+describe("tool call arguments", () => {
+  const tool = { id: "tool_1", name: "SetModel" };
+
+  it("captures shared arguments from toolCalled and keeps them through the result", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(
+      items,
+      event({
+        id: "e1",
+        type: "toolCalled",
+        toolCalled: { toolCallId: "tc1", tool, arguments: { model: "claude-opus-5" } },
+      }),
+    );
+    expect((items[0] as ToolItem).args).toEqual({ model: "claude-opus-5" });
+    items = applyEvent(
+      items,
+      event({ id: "e2", type: "toolResult", toolResult: { toolCallId: "tc1", tool } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("done");
+    expect((items[0] as ToolItem).args).toEqual({ model: "claude-opus-5" });
+  });
+
+  it("leaves args undefined for tools not sharing them", () => {
+    const items = applyEvent(
+      [],
+      event({ id: "e1", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool } }),
+    );
+    expect((items[0] as ToolItem).args).toBeUndefined();
+  });
+});
+
 describe("notices", () => {
   it("renders error events as notices and stops the typing indicator", () => {
     let items: TimelineItem[] = [

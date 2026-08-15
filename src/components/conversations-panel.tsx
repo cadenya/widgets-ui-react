@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { useConversation, useConversations, useWidgetConfig } from "../hooks";
+import { encodePageToolResult, usePageToolsStore } from "../page-tools";
 import { activeTools } from "../timeline";
 import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry";
 import { Composer } from "./composer";
@@ -59,6 +60,36 @@ export function ConversationsPanel({ toolComponents = {}, className }: Conversat
 
   const error = listError ?? threadError;
   const tools = activeTools(timeline);
+
+  // Page tools: execute pending bare calls whose tool has a registered
+  // handler (usePageTool under a shared PageToolsProvider) and submit the
+  // result. Only running calls fire — historical calls backfill with their
+  // toolResult and fold to done — and each toolCallId executes once per
+  // mount; a still-pending call after a reload correctly re-fires.
+  const pageTools = usePageToolsStore();
+  const executedRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!pageTools) return;
+    for (const item of activeTools(timeline)) {
+      if (item.status !== "running" || !item.tool) continue;
+      if (executedRef.current.has(item.toolCallId)) continue;
+      const handler = pageTools.resolve(item.tool);
+      if (!handler) continue;
+      executedRef.current.add(item.toolCallId);
+      const { toolCallId, tool, args } = item;
+      (async () => {
+        try {
+          const result = await handler({ toolCallId, tool, args });
+          await setToolCallContent(toolCallId, encodePageToolResult(result));
+        } catch (err) {
+          await setToolCallContent(
+            toolCallId,
+            JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+          );
+        }
+      })();
+    }
+  }, [timeline, pageTools, setToolCallContent]);
 
   return (
     <Flex

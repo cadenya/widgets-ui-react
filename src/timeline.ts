@@ -39,6 +39,8 @@ export interface ToolItem {
   status: ToolStatus;
   /** Result payload, only for tools opted into sharing content. */
   content?: unknown;
+  /** Call arguments, only for tools opted into sharing arguments. */
+  args?: unknown;
   createdAt: string;
 }
 
@@ -94,6 +96,7 @@ export function applyEvent(items: TimelineItem[], event: WidgetEvent): TimelineI
       return upsertTool(items, event.id, event.createdAt, event.toolCalled.toolCallId, {
         status: "running",
         tool: event.toolCalled.tool,
+        args: toolCallArgs(event.toolCalled),
       });
     case "toolResult":
       return upsertTool(items, event.id, event.createdAt, event.toolResult.toolCallId, {
@@ -147,7 +150,7 @@ function upsertTool(
   eventId: string,
   createdAt: string,
   toolCallId: string,
-  update: { status: ToolStatus; tool?: WidgetToolReference; content?: unknown },
+  update: { status: ToolStatus; tool?: WidgetToolReference; content?: unknown; args?: unknown },
 ): TimelineItem[] {
   const index = items.findIndex((item) => item.kind === "tool" && item.toolCallId === toolCallId);
   if (index === -1) {
@@ -155,9 +158,24 @@ function upsertTool(
   }
   return items.map((item, i) =>
     i === index && item.kind === "tool"
-      ? { ...item, id: eventId, ...update, tool: update.tool ?? item.tool }
+      ? {
+          ...item,
+          id: eventId,
+          ...update,
+          tool: update.tool ?? item.tool,
+          args: update.args ?? item.args,
+        }
       : item,
   );
+}
+
+/**
+ * Arguments for tools opted into sharing them with widget sessions. Tolerant
+ * to the wire field name until the SDK regenerates with the new event shape.
+ */
+function toolCallArgs(payload: object): unknown {
+  const record = payload as Record<string, unknown>;
+  return record.arguments ?? record.args;
 }
 
 /**

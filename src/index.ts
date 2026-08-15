@@ -2,6 +2,15 @@ export { CadenyaWidgetProvider, useWidgetClient } from "./context";
 export type { CadenyaWidgetProviderProps } from "./context";
 export { createAuthFetch, type AuthFetch, type AuthFetchOptions } from "./auth-fetch";
 export {
+  PageToolsProvider,
+  usePageTool,
+  usePageToolsStore,
+  encodePageToolResult,
+  type PageToolHandler,
+  type PageToolInvocation,
+  type PageToolsStore,
+} from "./page-tools";
+export {
   useConversation,
   useConversations,
   useWidgetConfig,
