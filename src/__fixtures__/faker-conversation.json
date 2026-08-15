@@ -1,0 +1,377 @@
+[
+  {
+    "id": "objevt_01M00PRMETZQRWT5VDM205E6MN",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:57:51.194220Z",
+    "type": "userMessage",
+    "userMessage": {
+      "content": "Hi! What can you help me with?"
+    }
+  },
+  {
+    "id": "objevt_01M00PRT3T8YC2340XFDZVMSS0",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:57:56.986768Z",
+    "type": "assistantMessage",
+    "assistantMessage": {
+      "content": "Hi there! 👋 I'm a demo agent built to showcase Cadenya's tool-calling abilities using a Faker MCP integration.\n\nHere's what I can do for you:\n\n- **Generate fake data** for testing/demo purposes — things like names, emails, addresses, phone numbers, companies, job titles, dates, credit card numbers, UUIDs, and much more.\n- **List available data generators** if you're not sure what's supported, I can search/filter them for you.\n- **Generate a PG-13 curse word** from a small built-in list, just for fun.\n\nFor example, you could ask me things like:\n- \"Generate a fake person with name, email, and address\"\n- \"Give me 5 fake company names\"\n- \"What faker options are available for dates?\"\n- \"Give me a fake curse word\"\n\nWant me to show you what's available, or do you have something specific in mind?"
+    }
+  },
+  {
+    "id": "objevt_01M00PS3PXS57HN8S1A8G3VTJ5",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:06.813257Z",
+    "type": "userMessage",
+    "userMessage": {
+      "content": "Generate a fake person with name, email, and address please."
+    }
+  },
+  {
+    "id": "objevt_01M00PS7QH04DPAPHRZGGMGS2K",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:10.929929Z",
+    "type": "assistantMessage",
+    "assistantMessage": {
+      "content": "I'll generate those three pieces of fake data for you now."
+    }
+  },
+  {
+    "id": "objevt_01M00PS8W4GVKVV1B401FKDWW7",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:12.100921Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PS8CAMSHQ9SPWW4EM6TWD",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PS8WM1G5A6F0ZPDGDT5DF",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:12.116271Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PS8B3RKC4GM7NGW9TX3N6",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PS8WYF16XY75V1E526741",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:12.126674Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PS8A9A5QPEQWRNXPF6GCF",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSABSD48B0ANCHP61NZNH",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:13.625387Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PS8CAMSHQ9SPWW4EM6TWD",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSACD1MBD3J2ZWRZEPST2",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:13.645718Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PS8A9A5QPEQWRNXPF6GCF",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSACKTZG1J2H50A5RE9ZA",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:13.651948Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PS8B3RKC4GM7NGW9TX3N6",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSEBS575AS98YSJPCG1ER",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:17.721816Z",
+    "type": "assistantMessage",
+    "assistantMessage": {
+      "content": "Looks like those exact names aren't supported — let me check the correct generator names first."
+    }
+  },
+  {
+    "id": "objevt_01M00PSESZFF6RXXEZDA3KNR6Y",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:18.175157Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSENMY3V4GH8Z9XD5XFJF",
+      "tool": {
+        "id": "tool_01KZ95182ZSDADNBF1V6PTDR1B",
+        "name": "GetFakerOptions"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSETX6AWSJZHR9MENBHTA",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:18.205264Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSEPB6FZPQYGXK0A85PTT",
+      "tool": {
+        "id": "tool_01KZ95182ZSDADNBF1V6PTDR1B",
+        "name": "GetFakerOptions"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSEW354T1K3H47KNFFQ09",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:18.243208Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSEQDRPJNC62NSH3KQYW0",
+      "tool": {
+        "id": "tool_01KZ95182ZSDADNBF1V6PTDR1B",
+        "name": "GetFakerOptions"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSFN2YR5Q9SAC907XF30S",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:19.042586Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSENMY3V4GH8Z9XD5XFJF",
+      "tool": {
+        "id": "tool_01KZ95182ZSDADNBF1V6PTDR1B",
+        "name": "GetFakerOptions"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSFSYGAMKQ4M208976AZB",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:19.198600Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSEQDRPJNC62NSH3KQYW0",
+      "tool": {
+        "id": "tool_01KZ95182ZSDADNBF1V6PTDR1B",
+        "name": "GetFakerOptions"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSFVGP1XYPZ41V1JB6J98",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:19.248935Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSEPB6FZPQYGXK0A85PTT",
+      "tool": {
+        "id": "tool_01KZ95182ZSDADNBF1V6PTDR1B",
+        "name": "GetFakerOptions"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSKRYCBDDA2HPBZ7W5Y5P",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:23.262605Z",
+    "type": "assistantMessage",
+    "assistantMessage": {
+      "content": "Got the correct generator names — now generating the actual data."
+    }
+  },
+  {
+    "id": "objevt_01M00PSMCZQBRJ5HX3QN56Y4GQ",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:23.903805Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSM7W95Q0W49TT260668P",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSMDHNW4A8QZAJYH49S0P",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:23.921520Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSM8MHW6J7XSVJ9D0RB8P",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSME88GE4YPX4WWNYD56K",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:23.944070Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSM98BHYJ43M4GZZPGH8J",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSMEYKPAG9XVR4PXR72AX",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:23.966735Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSMAP6SHHYJZ8HKR1WZ9E",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSMFF8E7BVEPBAXNSSEKD",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:23.983181Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSMA56KWQVJPQS7DTVCR1",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSMG9NGPF905SFDEHRYPC",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:24.009517Z",
+    "type": "toolCalled",
+    "toolCalled": {
+      "toolCallId": "toolcall_01M00PSMBDGQMS9KYDHG45K5YV",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSN9RVBC1SBY6N6NFQ05T",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:24.824311Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSM7W95Q0W49TT260668P",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSNAJTZVEE75B2RRGKW55",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:24.850383Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSM98BHYJ43M4GZZPGH8J",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSNDBW7TBHC961WQTZAZ3",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:24.939124Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSMA56KWQVJPQS7DTVCR1",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSNF8QTAKEVHT4M5J7ZZ6",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:25.000204Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSMAP6SHHYJZ8HKR1WZ9E",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSZKPP765YHNB0SZ7ECC0",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:35.382402Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSM8MHW6J7XSVJ9D0RB8P",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PSZVAV0X1ZBVNVM7VPBYM",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:35.626108Z",
+    "type": "toolResult",
+    "toolResult": {
+      "toolCallId": "toolcall_01M00PSMBDGQMS9KYDHG45K5YV",
+      "tool": {
+        "id": "tool_01KZ95182Q1GF7C74P09TMWJYA",
+        "name": "GenerateFake"
+      }
+    }
+  },
+  {
+    "id": "objevt_01M00PT9G3J932B52FQCPM5M3K",
+    "conversationId": "obj_01M00PRMD0NDKNKVGVXT02N1QQ",
+    "createdAt": "2026-08-14T17:58:45.507064Z",
+    "type": "assistantMessage",
+    "assistantMessage": {
+      "content": "Here's your fake person, freshly generated via Cadenya's Faker MCP tools:\n\n- **Name:** Mr. Sheldon Blick PhD\n- **Email:** boyle.rickey@gmail.com\n- **Address:** 8313 Pagac Cape Suite 595, Lake Kasandra, NH 90298-8249\n\nWant me to generate another one, add a phone number, or pull in a fake company/job title too?"
+    }
+  }
+]
