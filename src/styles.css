@@ -1,0 +1,220 @@
+/*
+ * Cadenya widgets UI kit — chat-specific styles on top of Radix Themes.
+ * Everything references Radix tokens (--accent-*, --gray-*, --radius-*,
+ * --space-*), so theming flows entirely from the surrounding <Theme>
+ * (appearance, accentColor, grayColor, radius, scaling). The cdny- class
+ * names are the stable contract for embedder CSS overrides.
+ */
+
+/* Conversation list */
+
+.cdny-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-2);
+  background: transparent;
+  color: var(--gray-12);
+  font: inherit;
+  font-size: var(--font-size-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cdny-list-item:hover {
+  background: var(--gray-a3);
+}
+
+.cdny-list-item.cdny-selected {
+  background: var(--accent-a3);
+}
+
+.cdny-list-new {
+  color: var(--accent-11);
+  font-weight: 500;
+}
+
+.cdny-list-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cdny-list-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: var(--accent-9);
+  flex-shrink: 0;
+}
+
+/* Message bubbles */
+
+.cdny-bubble {
+  max-width: 75%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-4);
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+  overflow-wrap: break-word;
+}
+
+.cdny-bubble-user {
+  align-self: flex-end;
+  background: var(--accent-9);
+  color: var(--accent-contrast);
+  border-bottom-right-radius: var(--radius-1);
+  white-space: pre-wrap;
+}
+
+.cdny-bubble-assistant {
+  align-self: flex-start;
+  background: var(--gray-a3);
+  color: var(--gray-12);
+  border-bottom-left-radius: var(--radius-1);
+}
+
+/* Typing indicator */
+
+.cdny-typing {
+  display: flex;
+  gap: 4px;
+  padding: var(--space-3);
+}
+
+.cdny-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-a9);
+  animation: cdny-pulse 1.2s ease-in-out infinite;
+}
+
+.cdny-typing span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.cdny-typing span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes cdny-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* Activity bar entrance */
+
+.cdny-activity .cdny-tool,
+.cdny-activity .cdny-activity-custom {
+  animation: cdny-fade-in 0.15s ease-out;
+}
+
+@keyframes cdny-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Markdown inside assistant bubbles */
+
+.cdny-bubble-assistant > :first-child {
+  margin-top: 0;
+}
+
+.cdny-bubble-assistant > :last-child {
+  margin-bottom: 0;
+}
+
+.cdny-bubble-assistant p,
+.cdny-bubble-assistant ul,
+.cdny-bubble-assistant ol,
+.cdny-bubble-assistant pre,
+.cdny-bubble-assistant blockquote,
+.cdny-bubble-assistant table {
+  margin: var(--space-2) 0;
+}
+
+.cdny-bubble-assistant ul,
+.cdny-bubble-assistant ol {
+  padding-left: var(--space-5);
+}
+
+.cdny-bubble-assistant li {
+  margin: calc(var(--space-1) / 2) 0;
+}
+
+.cdny-bubble-assistant h1,
+.cdny-bubble-assistant h2,
+.cdny-bubble-assistant h3,
+.cdny-bubble-assistant h4 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 1em;
+  font-weight: var(--font-weight-bold);
+}
+
+.cdny-bubble-assistant a {
+  color: var(--accent-11);
+  text-decoration: underline;
+}
+
+.cdny-bubble-assistant code {
+  padding: 1px 5px;
+  border-radius: var(--radius-1);
+  background: var(--gray-a4);
+  font-family: var(--code-font-family);
+  font-size: 0.85em;
+}
+
+.cdny-bubble-assistant pre {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  background: var(--gray-a4);
+  overflow-x: auto;
+}
+
+.cdny-bubble-assistant pre code {
+  padding: 0;
+  background: none;
+}
+
+.cdny-bubble-assistant blockquote {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--gray-a6);
+  color: var(--gray-11);
+}
+
+.cdny-bubble-assistant table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.cdny-bubble-assistant th,
+.cdny-bubble-assistant td {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--gray-a6);
+  text-align: left;
+}
+
+.cdny-bubble-assistant hr {
+  margin: var(--space-3) 0;
+  border: 0;
+  border-top: 1px solid var(--gray-a6);
+}
