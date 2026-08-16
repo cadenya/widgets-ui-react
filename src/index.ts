@@ -35,6 +35,7 @@ export {
 } from "./tool-registry.js";
 export {
   ConversationsPanel,
+  type BubbleColors,
   type ConversationsPanelProps,
 } from "./components/conversations-panel.js";
 export { ConversationList, type ConversationListProps } from "./components/conversation-list.js";

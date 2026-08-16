@@ -62,19 +62,32 @@
   overflow-wrap: break-word;
 }
 
+/*
+ * Bubble colors are overridable via the --cdny-bubble-* variables (set them
+ * in CSS or through ConversationsPanel's bubbleColors prop); defaults follow
+ * the surrounding Radix Theme. Values are full `background` values, so
+ * gradients work.
+ */
 .cdny-bubble-user {
   align-self: flex-end;
-  background: var(--accent-9);
-  color: var(--accent-contrast);
+  background: var(--cdny-bubble-user-bg, var(--accent-9));
+  color: var(--cdny-bubble-user-fg, var(--accent-contrast));
   border-bottom-right-radius: var(--radius-1);
   white-space: pre-wrap;
 }
 
 .cdny-bubble-assistant {
   align-self: flex-start;
-  background: var(--gray-a3);
-  color: var(--gray-12);
+  background: var(--cdny-bubble-assistant-bg, var(--gray-a3));
+  color: var(--cdny-bubble-assistant-fg, var(--gray-12));
   border-bottom-left-radius: var(--radius-1);
+}
+
+/* On the floating variant's matte main area, assistant bubbles read best as
+ * elevated cards. */
+.cdny-panel-floating .cdny-bubble-assistant {
+  background: var(--cdny-bubble-assistant-bg, var(--color-panel-solid));
+  box-shadow: var(--shadow-2);
 }
 
 /* Typing indicator */

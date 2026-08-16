@@ -43,10 +43,23 @@ streams and mounted hooks survive the rotation.
 
 The surrounding `<Theme>` is the appearance API: `appearance`
 (`"inherit" | "light" | "dark"`), `accentColor`, `grayColor`, `radius`,
-`scaling`. The kit's own CSS references only Radix tokens. For anything
-beyond Theme props, the stable `cdny-` class names (`.cdny-panel`,
-`.cdny-bubble-user`, `.cdny-composer`, `.cdny-tool`, …) are the contract for
-custom CSS; the panel's `className` prop handles sizing and placement.
+`scaling`. The kit's own CSS references only Radix tokens. On top of that:
+
+```tsx
+<ConversationsPanel
+  composer="floating" // "bar" (default) | "pill" | "floating"
+  bubbleColors={{ user: "linear-gradient(135deg, #0d9488, #115e59)", userText: "white" }}
+/>
+```
+
+`composer="pill"` fuses the input and send button into one rounded capsule;
+`"floating"` lifts the capsule onto a shadowed card over a matte main area,
+where assistant bubbles render as elevated cards. `bubbleColors` values are
+full CSS backgrounds (gradients work) — equivalent to setting the
+`--cdny-bubble-*` variables from CSS. For anything beyond that, the stable
+`cdny-` class names (`.cdny-panel`, `.cdny-bubble-user`, `.cdny-composer`,
+`.cdny-tool`, …) are the contract for custom CSS; the panel's `className`
+prop handles sizing and placement.
 
 ## Custom tool renderers
 

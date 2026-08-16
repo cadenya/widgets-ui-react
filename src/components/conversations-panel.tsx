@@ -26,8 +26,31 @@ export interface ConversationsPanelProps {
    * capsule onto a shadowed card over a matte main area.
    */
   composer?: ComposerVariant;
+  /**
+   * Custom bubble colors. Each value is a full CSS background (gradients
+   * work) or text color; unset values follow the surrounding Radix Theme.
+   * Equivalent to setting the --cdny-bubble-* variables from CSS.
+   */
+  bubbleColors?: BubbleColors;
   /** Additional class for the panel root (sizing, positioning). */
   className?: string;
+}
+
+export interface BubbleColors {
+  user?: string;
+  userText?: string;
+  assistant?: string;
+  assistantText?: string;
+}
+
+function bubbleColorStyle(colors: BubbleColors | undefined): Record<string, string> {
+  if (!colors) return {};
+  const style: Record<string, string> = {};
+  if (colors.user) style["--cdny-bubble-user-bg"] = colors.user;
+  if (colors.userText) style["--cdny-bubble-user-fg"] = colors.userText;
+  if (colors.assistant) style["--cdny-bubble-assistant-bg"] = colors.assistant;
+  if (colors.assistantText) style["--cdny-bubble-assistant-fg"] = colors.assistantText;
+  return style;
 }
 
 /**
@@ -41,6 +64,7 @@ export interface ConversationsPanelProps {
 export function ConversationsPanel({
   toolComponents = {},
   composer = "bar",
+  bubbleColors,
   className,
 }: ConversationsPanelProps = {}) {
   const config = useWidgetConfig();
@@ -117,6 +141,7 @@ export function ConversationsPanel({
         border: "1px solid var(--gray-a6)",
         borderRadius: "var(--radius-4)",
         background: "var(--color-panel-solid)",
+        ...bubbleColorStyle(bubbleColors),
       }}
     >
       <Flex
