@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createAuthFetch } from "./auth-fetch";
+import { createAuthFetch } from "./auth-fetch.js";
 
 let calls: { auth: string | null }[];
 let validToken: string;

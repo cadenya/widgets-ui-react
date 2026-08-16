@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import type { WidgetToolCalledEvent, WidgetToolReference } from "@cadenya/widgets";
-import type { ToolStatus } from "./timeline";
+import type { ToolStatus } from "./timeline.js";
 
 /**
  * Custom renderers for tool calls, keyed by the tool's canonical `tool_…` id

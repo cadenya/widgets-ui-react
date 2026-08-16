@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { CadenyaWidgets } from "@cadenya/widgets";
-import { createAuthFetch } from "./auth-fetch";
+import { createAuthFetch } from "./auth-fetch.js";
 
 const WidgetClientContext = createContext<CadenyaWidgets | null>(null);
 
@@ -74,6 +74,22 @@ export function CadenyaWidgetProvider({ host, token, getToken, children }: Caden
     [host, auth, initialToken],
   );
 
+  return <WidgetClientContext.Provider value={client}>{children}</WidgetClientContext.Provider>;
+}
+
+export interface WidgetClientProviderProps {
+  /** A preconstructed client (or a test double shaped like one). */
+  client: CadenyaWidgets;
+  children: ReactNode;
+}
+
+/**
+ * Escape hatch: provide an already-constructed CadenyaWidgets client (or a
+ * test double) to the tree, bypassing the host/token/getToken auth layer.
+ * Intended for tests, Storybook, and embedders that manage the client
+ * themselves; most apps want <CadenyaWidgetProvider>.
+ */
+export function WidgetClientProvider({ client, children }: WidgetClientProviderProps) {
   return <WidgetClientContext.Provider value={client}>{children}</WidgetClientContext.Provider>;
 }
 

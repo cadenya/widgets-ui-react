@@ -22,3 +22,15 @@ test:
 # Install dependencies
 install:
     npm install
+
+# Start Storybook on http://localhost:6006 (mock backend, no credentials needed)
+storybook:
+    npm run storybook
+
+# Build the static Storybook into storybook-static/
+storybook-build:
+    npm run build-storybook
+
+# Typecheck stories and .storybook config
+storybook-typecheck:
+    npm run typecheck:storybook

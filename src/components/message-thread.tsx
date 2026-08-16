@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Badge, Flex, ScrollArea } from "@radix-ui/themes";
-import type { NoticeItem, TimelineItem } from "../timeline";
-import { awaitingReply } from "../timeline";
+import type { NoticeItem, TimelineItem } from "../timeline.js";
+import { awaitingReply } from "../timeline.js";
 
 export interface MessageThreadProps {
   timeline: TimelineItem[];

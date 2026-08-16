@@ -1,17 +1,25 @@
 "use client";
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { Flex, IconButton, TextArea } from "@radix-ui/themes";
+import { IconButton } from "@radix-ui/themes";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
+
+export type ComposerVariant = "bar" | "pill" | "floating";
 
 export interface ComposerProps {
   onSend: (message: string) => Promise<void> | void;
   disabled?: boolean;
   placeholder?: string;
+  /**
+   * bar (default): full-width footer with a bordered input.
+   * pill: input and send button share one rounded capsule.
+   * floating: the capsule floats on a shadowed card over a matte main area.
+   */
+  variant?: ComposerVariant;
 }
 
 /** Message input: Enter sends, Shift+Enter inserts a newline. */
-export function Composer({ onSend, disabled, placeholder }: ComposerProps) {
+export function Composer({ onSend, disabled, placeholder, variant = "bar" }: ComposerProps) {
   const [draft, setDraft] = useState("");
 
   const submit = async (event?: FormEvent) => {
@@ -30,37 +38,26 @@ export function Composer({ onSend, disabled, placeholder }: ComposerProps) {
   };
 
   return (
-    <Flex
-      asChild
-      className="cdny-composer"
-      gap="2"
-      align="end"
-      p="3"
-      style={{ borderTop: "1px solid var(--gray-a6)" }}
-    >
-      <form onSubmit={submit}>
-        <TextArea
-          className="cdny-composer-input"
-          style={{ flex: 1 }}
-          size="2"
-          rows={1}
-          resize="none"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={placeholder ?? "Send a message…"}
-          disabled={disabled}
-        />
-        <IconButton
-          className="cdny-composer-send"
-          type="submit"
-          size="2"
-          disabled={disabled || !draft.trim()}
-          aria-label="Send"
-        >
-          <PaperPlaneIcon />
-        </IconButton>
-      </form>
-    </Flex>
+    <form className={`cdny-composer cdny-composer-${variant}`} onSubmit={submit}>
+      <textarea
+        className="cdny-composer-input"
+        rows={1}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder ?? "Send a message…"}
+        disabled={disabled}
+      />
+      <IconButton
+        className="cdny-composer-send"
+        type="submit"
+        size="2"
+        radius={variant === "bar" ? undefined : "full"}
+        disabled={disabled || !draft.trim()}
+        aria-label="Send"
+      >
+        <PaperPlaneIcon />
+      </IconButton>
+    </form>
   );
 }

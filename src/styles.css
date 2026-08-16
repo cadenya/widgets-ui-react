@@ -62,19 +62,32 @@
   overflow-wrap: break-word;
 }
 
+/*
+ * Bubble colors are overridable via the --cdny-bubble-* variables (set them
+ * in CSS or through ConversationsPanel's bubbleColors prop); defaults follow
+ * the surrounding Radix Theme. Values are full `background` values, so
+ * gradients work.
+ */
 .cdny-bubble-user {
   align-self: flex-end;
-  background: var(--accent-9);
-  color: var(--accent-contrast);
+  background: var(--cdny-bubble-user-bg, var(--accent-9));
+  color: var(--cdny-bubble-user-fg, var(--accent-contrast));
   border-bottom-right-radius: var(--radius-1);
   white-space: pre-wrap;
 }
 
 .cdny-bubble-assistant {
   align-self: flex-start;
-  background: var(--gray-a3);
-  color: var(--gray-12);
+  background: var(--cdny-bubble-assistant-bg, var(--gray-a3));
+  color: var(--cdny-bubble-assistant-fg, var(--gray-12));
   border-bottom-left-radius: var(--radius-1);
+}
+
+/* On the floating variant's matte main area, assistant bubbles read best as
+ * elevated cards. */
+.cdny-panel-floating .cdny-bubble-assistant {
+  background: var(--cdny-bubble-assistant-bg, var(--color-panel-solid));
+  box-shadow: var(--shadow-2);
 }
 
 /* Typing indicator */
@@ -130,6 +143,92 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Composer */
+
+.cdny-composer {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.cdny-composer-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: 1px solid var(--gray-a7);
+  border-radius: var(--radius-3);
+  background: var(--color-surface);
+  color: var(--gray-12);
+  font-family: inherit;
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+  padding: var(--space-2) var(--space-3);
+  outline: none;
+}
+
+.cdny-composer-input::placeholder {
+  color: var(--gray-a10);
+}
+
+.cdny-composer-input:disabled {
+  opacity: 0.6;
+}
+
+/* bar: full-width footer */
+
+.cdny-composer-bar {
+  padding: var(--space-3);
+  border-top: 1px solid var(--gray-a6);
+}
+
+.cdny-composer-bar .cdny-composer-input:focus {
+  border-color: var(--focus-8, var(--accent-8));
+  box-shadow: 0 0 0 1px var(--focus-8, var(--accent-8));
+}
+
+/* pill: input and send button share one rounded capsule */
+
+.cdny-composer-pill,
+.cdny-composer-floating {
+  align-items: center;
+  margin: var(--space-3);
+  padding: var(--space-1);
+  padding-left: var(--space-2);
+  border: 1px solid var(--gray-a6);
+  border-radius: 9999px;
+  background: var(--color-surface);
+}
+
+.cdny-composer-pill:focus-within,
+.cdny-composer-floating:focus-within {
+  border-color: var(--focus-8, var(--accent-8));
+  box-shadow: 0 0 0 1px var(--focus-8, var(--accent-8));
+}
+
+.cdny-composer-pill .cdny-composer-input,
+.cdny-composer-floating .cdny-composer-input {
+  border: 0;
+  background: transparent;
+  padding: var(--space-1) var(--space-2);
+}
+
+/* floating: the capsule lifts onto a shadowed card over a matte main area */
+
+.cdny-composer-floating {
+  margin: var(--space-2) var(--space-4) var(--space-4);
+  border-color: var(--gray-a5);
+  background: var(--color-panel-solid);
+  box-shadow: var(--shadow-4);
+}
+
+.cdny-composer-floating:focus-within {
+  box-shadow: var(--shadow-4), 0 0 0 1px var(--focus-8, var(--accent-8));
+}
+
+.cdny-panel-floating .cdny-panel-main {
+  background: var(--gray-2);
 }
 
 /* Markdown inside assistant bubbles */

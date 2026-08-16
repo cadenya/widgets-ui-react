@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, Button, Flex, Spinner, Strong, Text } from "@radix-ui/themes";
-import type { ToolItem } from "../timeline";
+import type { ToolItem } from "../timeline.js";
 
 const TOOL_STATUS_LABEL: Record<ToolItem["status"], string> = {
   approvalRequested: "wants to run",

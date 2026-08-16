@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
-import { useConversation, useConversations, useWidgetConfig } from "../hooks";
-import { encodePageToolResult, usePageToolsStore } from "../page-tools";
-import { activeTools } from "../timeline";
-import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry";
-import { Composer } from "./composer";
-import { ConversationList } from "./conversation-list";
-import { MessageThread } from "./message-thread";
-import { ToolActivity } from "./tool-activity";
+import { useConversation, useConversations, useWidgetConfig } from "../hooks.js";
+import { encodePageToolResult, usePageToolsStore } from "../page-tools.js";
+import { activeTools } from "../timeline.js";
+import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry.js";
+import { Composer, type ComposerVariant } from "./composer.js";
+import { ConversationList } from "./conversation-list.js";
+import { MessageThread } from "./message-thread.js";
+import { ToolActivity } from "./tool-activity.js";
 
 export interface ConversationsPanelProps {
   /**
@@ -20,8 +20,37 @@ export interface ConversationsPanelProps {
    * result, and a submit callback wired to setToolCallContent (bare tools).
    */
   toolComponents?: ToolComponentRegistry;
+  /**
+   * Composer style: "bar" (default) is a full-width footer; "pill" fuses the
+   * input and send button into one rounded capsule; "floating" lifts the
+   * capsule onto a shadowed card over a matte main area.
+   */
+  composer?: ComposerVariant;
+  /**
+   * Custom bubble colors. Each value is a full CSS background (gradients
+   * work) or text color; unset values follow the surrounding Radix Theme.
+   * Equivalent to setting the --cdny-bubble-* variables from CSS.
+   */
+  bubbleColors?: BubbleColors;
   /** Additional class for the panel root (sizing, positioning). */
   className?: string;
+}
+
+export interface BubbleColors {
+  user?: string;
+  userText?: string;
+  assistant?: string;
+  assistantText?: string;
+}
+
+function bubbleColorStyle(colors: BubbleColors | undefined): Record<string, string> {
+  if (!colors) return {};
+  const style: Record<string, string> = {};
+  if (colors.user) style["--cdny-bubble-user-bg"] = colors.user;
+  if (colors.userText) style["--cdny-bubble-user-fg"] = colors.userText;
+  if (colors.assistant) style["--cdny-bubble-assistant-bg"] = colors.assistant;
+  if (colors.assistantText) style["--cdny-bubble-assistant-fg"] = colors.assistantText;
+  return style;
 }
 
 /**
@@ -32,7 +61,12 @@ export interface ConversationsPanelProps {
  * (ConversationList, MessageThread, Composer) and hooks are exported for
  * custom layouts.
  */
-export function ConversationsPanel({ toolComponents = {}, className }: ConversationsPanelProps = {}) {
+export function ConversationsPanel({
+  toolComponents = {},
+  composer = "bar",
+  bubbleColors,
+  className,
+}: ConversationsPanelProps = {}) {
   const config = useWidgetConfig();
   const { conversations, loading: listLoading, error: listError, create, refresh } =
     useConversations();
@@ -93,7 +127,13 @@ export function ConversationsPanel({ toolComponents = {}, className }: Conversat
 
   return (
     <Flex
-      className={className ? `cdny-panel ${className}` : "cdny-panel"}
+      className={[
+        "cdny-panel",
+        composer === "floating" ? "cdny-panel-floating" : "",
+        className ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       height="100%"
       minHeight="28rem"
       overflow="hidden"
@@ -101,6 +141,7 @@ export function ConversationsPanel({ toolComponents = {}, className }: Conversat
         border: "1px solid var(--gray-a6)",
         borderRadius: "var(--radius-4)",
         background: "var(--color-panel-solid)",
+        ...bubbleColorStyle(bubbleColors),
       }}
     >
       <Flex
@@ -183,6 +224,7 @@ export function ConversationsPanel({ toolComponents = {}, className }: Conversat
           </Flex>
         )}
         <Composer
+          variant={composer}
           onSend={onSend}
           disabled={sending}
           placeholder={selectedId ? "Send a message…" : "Ask anything to get started…"}

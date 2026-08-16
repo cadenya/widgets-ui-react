@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPageToolsStore, encodePageToolResult } from "./page-tools";
+import { createPageToolsStore, encodePageToolResult } from "./page-tools.js";
 
 const noop = () => undefined;
 

@@ -9,7 +9,7 @@ import {
   type MessageItem,
   type TimelineItem,
   type ToolItem,
-} from "./timeline";
+} from "./timeline.js";
 
 // A real conversation captured from the widget host: two visitor turns, five
 // assistant segments interleaved with twelve tool calls (3 GenerateFake, 3
