@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { CadenyaWidgets } from "@cadenya/widgets";
-import { createAuthFetch } from "./auth-fetch";
+import { createAuthFetch } from "./auth-fetch.js";
 
 const WidgetClientContext = createContext<CadenyaWidgets | null>(null);
 

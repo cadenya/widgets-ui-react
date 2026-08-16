@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
-import { useConversation, useConversations, useWidgetConfig } from "../hooks";
-import { encodePageToolResult, usePageToolsStore } from "../page-tools";
-import { activeTools } from "../timeline";
-import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry";
-import { Composer } from "./composer";
-import { ConversationList } from "./conversation-list";
-import { MessageThread } from "./message-thread";
-import { ToolActivity } from "./tool-activity";
+import { useConversation, useConversations, useWidgetConfig } from "../hooks.js";
+import { encodePageToolResult, usePageToolsStore } from "../page-tools.js";
+import { activeTools } from "../timeline.js";
+import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry.js";
+import { Composer } from "./composer.js";
+import { ConversationList } from "./conversation-list.js";
+import { MessageThread } from "./message-thread.js";
+import { ToolActivity } from "./tool-activity.js";
 
 export interface ConversationsPanelProps {
   /**

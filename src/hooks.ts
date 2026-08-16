@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useReducer, useState } from "react";
 import type { WidgetConfig, WidgetConversation, WidgetEvent } from "@cadenya/widgets";
-import { useWidgetClient } from "./context";
-import { applyEvent, applyEvents, type TimelineItem } from "./timeline";
+import { useWidgetClient } from "./context.js";
+import { applyEvent, applyEvents, type TimelineItem } from "./timeline.js";
 
 /** Widget display metadata (name for the header). */
 export function useWidgetConfig(): WidgetConfig | null {
