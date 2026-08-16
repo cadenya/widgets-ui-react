@@ -97,3 +97,23 @@ just test        # vitest
 just build       # tsc → dist/
 just dev         # tsc --watch, for file:-linked consumers
 ```
+
+### Storybook
+
+```sh
+just storybook   # http://localhost:6006
+```
+
+Every component has stories under `src/components/*.stories.tsx`, and the
+full `ConversationsPanel` runs against an in-memory mock backend
+(`src/__stories__/mock-client.ts`) with a scripted agent — streaming replies,
+tool runs, approval requests, page tools, custom tool renderers, and error
+notices are all interactive without credentials. The toolbar exposes the
+Radix Theme knobs (appearance, accent, gray, radius, scaling), so a design
+change can be reviewed across themes in one place. `just storybook-typecheck`
+type-checks the stories; `just storybook-build` emits a static site into
+`storybook-static/`.
+
+The mock is injected through `WidgetClientProvider`, the exported escape
+hatch for supplying a preconstructed (or fake) client instead of
+`host`/`token` — handy for your own tests too.

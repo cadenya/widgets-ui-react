@@ -1,5 +1,5 @@
-export { CadenyaWidgetProvider, useWidgetClient } from "./context.js";
-export type { CadenyaWidgetProviderProps } from "./context.js";
+export { CadenyaWidgetProvider, WidgetClientProvider, useWidgetClient } from "./context.js";
+export type { CadenyaWidgetProviderProps, WidgetClientProviderProps } from "./context.js";
 export { createAuthFetch, type AuthFetch, type AuthFetchOptions } from "./auth-fetch.js";
 export {
   PageToolsProvider,
