@@ -39,5 +39,5 @@ export {
 } from "./components/conversations-panel.js";
 export { ConversationList, type ConversationListProps } from "./components/conversation-list.js";
 export { MessageThread, type MessageThreadProps } from "./components/message-thread.js";
-export { Composer, type ComposerProps } from "./components/composer.js";
+export { Composer, type ComposerProps, type ComposerVariant } from "./components/composer.js";
 export { ToolActivity, type ToolActivityProps } from "./components/tool-activity.js";

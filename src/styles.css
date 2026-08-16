@@ -132,6 +132,92 @@
   }
 }
 
+/* Composer */
+
+.cdny-composer {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.cdny-composer-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: 1px solid var(--gray-a7);
+  border-radius: var(--radius-3);
+  background: var(--color-surface);
+  color: var(--gray-12);
+  font-family: inherit;
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+  padding: var(--space-2) var(--space-3);
+  outline: none;
+}
+
+.cdny-composer-input::placeholder {
+  color: var(--gray-a10);
+}
+
+.cdny-composer-input:disabled {
+  opacity: 0.6;
+}
+
+/* bar: full-width footer */
+
+.cdny-composer-bar {
+  padding: var(--space-3);
+  border-top: 1px solid var(--gray-a6);
+}
+
+.cdny-composer-bar .cdny-composer-input:focus {
+  border-color: var(--focus-8, var(--accent-8));
+  box-shadow: 0 0 0 1px var(--focus-8, var(--accent-8));
+}
+
+/* pill: input and send button share one rounded capsule */
+
+.cdny-composer-pill,
+.cdny-composer-floating {
+  align-items: center;
+  margin: var(--space-3);
+  padding: var(--space-1);
+  padding-left: var(--space-2);
+  border: 1px solid var(--gray-a6);
+  border-radius: 9999px;
+  background: var(--color-surface);
+}
+
+.cdny-composer-pill:focus-within,
+.cdny-composer-floating:focus-within {
+  border-color: var(--focus-8, var(--accent-8));
+  box-shadow: 0 0 0 1px var(--focus-8, var(--accent-8));
+}
+
+.cdny-composer-pill .cdny-composer-input,
+.cdny-composer-floating .cdny-composer-input {
+  border: 0;
+  background: transparent;
+  padding: var(--space-1) var(--space-2);
+}
+
+/* floating: the capsule lifts onto a shadowed card over a matte main area */
+
+.cdny-composer-floating {
+  margin: var(--space-2) var(--space-4) var(--space-4);
+  border-color: var(--gray-a5);
+  background: var(--color-panel-solid);
+  box-shadow: var(--shadow-4);
+}
+
+.cdny-composer-floating:focus-within {
+  box-shadow: var(--shadow-4), 0 0 0 1px var(--focus-8, var(--accent-8));
+}
+
+.cdny-panel-floating .cdny-panel-main {
+  background: var(--gray-2);
+}
+
 /* Markdown inside assistant bubbles */
 
 .cdny-bubble-assistant > :first-child {

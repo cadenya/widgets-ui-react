@@ -7,7 +7,7 @@ import { useConversation, useConversations, useWidgetConfig } from "../hooks.js"
 import { encodePageToolResult, usePageToolsStore } from "../page-tools.js";
 import { activeTools } from "../timeline.js";
 import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry.js";
-import { Composer } from "./composer.js";
+import { Composer, type ComposerVariant } from "./composer.js";
 import { ConversationList } from "./conversation-list.js";
 import { MessageThread } from "./message-thread.js";
 import { ToolActivity } from "./tool-activity.js";
@@ -20,6 +20,12 @@ export interface ConversationsPanelProps {
    * result, and a submit callback wired to setToolCallContent (bare tools).
    */
   toolComponents?: ToolComponentRegistry;
+  /**
+   * Composer style: "bar" (default) is a full-width footer; "pill" fuses the
+   * input and send button into one rounded capsule; "floating" lifts the
+   * capsule onto a shadowed card over a matte main area.
+   */
+  composer?: ComposerVariant;
   /** Additional class for the panel root (sizing, positioning). */
   className?: string;
 }
@@ -32,7 +38,11 @@ export interface ConversationsPanelProps {
  * (ConversationList, MessageThread, Composer) and hooks are exported for
  * custom layouts.
  */
-export function ConversationsPanel({ toolComponents = {}, className }: ConversationsPanelProps = {}) {
+export function ConversationsPanel({
+  toolComponents = {},
+  composer = "bar",
+  className,
+}: ConversationsPanelProps = {}) {
   const config = useWidgetConfig();
   const { conversations, loading: listLoading, error: listError, create, refresh } =
     useConversations();
@@ -93,7 +103,13 @@ export function ConversationsPanel({ toolComponents = {}, className }: Conversat
 
   return (
     <Flex
-      className={className ? `cdny-panel ${className}` : "cdny-panel"}
+      className={[
+        "cdny-panel",
+        composer === "floating" ? "cdny-panel-floating" : "",
+        className ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       height="100%"
       minHeight="28rem"
       overflow="hidden"
@@ -183,6 +199,7 @@ export function ConversationsPanel({ toolComponents = {}, className }: Conversat
           </Flex>
         )}
         <Composer
+          variant={composer}
           onSend={onSend}
           disabled={sending}
           placeholder={selectedId ? "Send a message…" : "Ask anything to get started…"}
