@@ -16,8 +16,9 @@ export interface ConversationsPanelProps {
   /**
    * Custom renderers for tool calls, keyed by the tool's id or external id.
    * A registered component replaces the default activity chip for the call's
-   * active lifecycle, receiving the toolCalled payload, its folded status and
-   * result, and a submit callback wired to setToolCallContent (bare tools).
+   * active lifecycle, receiving the toolCalled payload, its folded status,
+   * exposed arguments and result, and a submit callback wired to
+   * setToolCallContent (bare tools).
    */
   toolComponents?: ToolComponentRegistry;
   /**
@@ -206,6 +207,7 @@ export function ConversationsPanel({
                     <Custom
                       toolCall={{ toolCallId: item.toolCallId, tool: item.tool }}
                       status={item.status}
+                      args={item.args}
                       result={item.content}
                       submit={(content) => setToolCallContent(item.toolCallId, content)}
                     />

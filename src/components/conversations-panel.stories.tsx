@@ -196,8 +196,10 @@ export const AgentError: Story = {
 };
 
 /** A custom renderer for a bare tool: gathers a date from the visitor and submits it. */
-function PickDateTool({ status, result, submit }: ToolRenderProps) {
+function PickDateTool({ status, args, result, submit }: ToolRenderProps) {
   const [date, setDate] = useState("");
+  // Exposed arguments arrive untyped; validate before trusting the shape.
+  const { service, duration } = (args ?? {}) as { service?: string; duration?: string };
   if (status === "done") {
     return (
       <Card size="1">
@@ -210,7 +212,10 @@ function PickDateTool({ status, result, submit }: ToolRenderProps) {
   return (
     <Card size="1">
       <Flex align="center" gap="2" wrap="wrap">
-        <Text size="2">Pick a date for your appointment</Text>
+        <Text size="2">
+          Pick a date for your {service ?? "appointment"}
+          {duration ? ` (${duration})` : ""}
+        </Text>
         <input
           type="date"
           value={date}
@@ -230,8 +235,9 @@ export const CustomToolComponent: Story = {
     <MockProvider seeded={false} agent={customToolAgent}>
       <ConversationsPanel {...args} toolComponents={{ [TOOLS.pickDate.externalId]: PickDateTool }} />
       <Hint>
-        The PickDate tool is registered by external id; its component replaces the activity chip
-        and delivers the visitor's choice via <code>submit</code>.
+        The PickDate tool is registered by external id; its component replaces the activity chip,
+        reads the call's exposed <code>args</code> (service, duration), and delivers the visitor's
+        choice via <code>submit</code>.
       </Hint>
     </MockProvider>
   ),

@@ -435,7 +435,15 @@ export const pageToolAgent: MockAgent = async ({ message, emit, stream, sleep, w
 export const customToolAgent: MockAgent = async ({ emit, stream, sleep, waitForToolContent, newToolCallId }) => {
   await stream("Happy to book that. Pick a date below and I'll take it from there.");
   const toolCallId = newToolCallId();
-  emit({ type: "toolCalled", toolCalled: { toolCallId, tool: TOOLS.pickDate } });
+  emit({
+    type: "toolCalled",
+    toolCalled: {
+      toolCallId,
+      tool: TOOLS.pickDate,
+      // Exposed arguments (the tool set's widget argument exposure overlay).
+      arguments: { service: "consultation", duration: "30 min" },
+    } as never,
+  });
   const content = await waitForToolContent(toolCallId);
   await sleep(400);
   await stream(`Booked for **${content}**. You'll get a confirmation email shortly.`);

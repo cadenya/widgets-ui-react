@@ -23,6 +23,13 @@ export interface ToolRenderProps {
   /** The call's lifecycle, folded from subsequent events. */
   status: ToolStatus;
   /**
+   * The call's arguments as the agent supplied them — only for tools the
+   * workspace opted into exposing arguments to widget sessions (the tool
+   * set's widget argument exposure overlay). Absent otherwise; the runtime
+   * decides what reaches the browser, the kit only forwards it.
+   */
+  args?: unknown;
+  /**
    * toolResult content, present once the call finishes — only for tools the
    * workspace opted into sharing content with widget sessions.
    */
