@@ -77,6 +77,26 @@ export const AwaitingReply: Story = {
   },
 };
 
+/** An assistant turn that only called tools arrives as an empty message — no stray bubble. */
+export const ToolOnlyTurn: Story = {
+  name: "Tool-only turn (no empty bubble)",
+  args: {
+    timeline: [
+      msg("user", "Show me a demo resource card"),
+      msg("assistant", ""),
+      {
+        kind: "tool",
+        id: "evt_tool",
+        toolCallId: "toolcall_display",
+        tool: { id: "tool_display", externalId: "display_resource", name: "DisplayResource" },
+        status: "done",
+        createdAt: new Date().toISOString(),
+      },
+      msg("assistant", "Here's the card you asked for."),
+    ],
+  },
+};
+
 export const MarkdownKitchenSink: Story = {
   args: {
     timeline: [msg("user", "Show me everything markdown can do."), msg("assistant", MARKDOWN_KITCHEN_SINK)],

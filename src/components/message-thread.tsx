@@ -16,6 +16,12 @@ export interface MessageThreadProps {
  * Renders the conversation's messages and notices. Tool activity is not shown
  * inline — the in-flight run lives in the panel's activity bar (activeTools)
  * and retires once the agent's next message arrives.
+ *
+ * A message with no visible text renders no bubble: an assistant turn that
+ * only calls tools still arrives as an assistantMessage event (its content
+ * empty), and a streaming reply may start empty. The item stays in the
+ * timeline, so once a later event for the same id carries text, the bubble
+ * appears.
  */
 export function MessageThread({ timeline, loading }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -38,6 +44,7 @@ export function MessageThread({ timeline, loading }: MessageThreadProps) {
         {timeline.map((item) => {
           switch (item.kind) {
             case "message":
+              if (!item.content.trim()) return null;
               return (
                 <div key={item.id} className={`cdny-bubble cdny-bubble-${item.role}`}>
                   {item.role === "assistant" ? (
