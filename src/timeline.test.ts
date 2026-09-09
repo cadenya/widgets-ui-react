@@ -202,6 +202,55 @@ describe("out-of-order and duplicate tool events", () => {
     expect((twice[0] as ToolItem).content).toEqual({ ok: true });
   });
 
+  it("keeps a denied call denied when the runtime's denial result follows", () => {
+    // Real widget payloads (REST history and SSE agree): toolApprovalRequested,
+    // toolDenied, then a content-less toolResult for the same call.
+    const steps: WidgetEvent[] = [
+      event({ id: "e1", type: "toolApprovalRequested", toolApprovalRequested: { toolCallId: "tc1", tool } }),
+      event({ id: "e2", type: "toolDenied", toolDenied: { toolCallId: "tc1" } }),
+      event({ id: "e3", type: "toolResult", toolResult: { toolCallId: "tc1", tool } }),
+    ];
+    const items = applyEvents([], steps);
+    expect(items).toHaveLength(1);
+    expect((items[0] as ToolItem).status).toBe("denied");
+    expect((items[0] as ToolItem).tool).toEqual(tool);
+    // Replaying the same history changes nothing.
+    expect(applyEvents(items, steps)).toEqual(items);
+  });
+
+  it("retains result content and stays denied when the denial result carries content", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(items, event({ id: "e1", type: "toolDenied", toolDenied: { toolCallId: "tc1" } }));
+    items = applyEvent(
+      items,
+      event({ id: "e2", type: "toolResult", toolResult: { toolCallId: "tc1", tool, content: "denied" } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("denied");
+    expect((items[0] as ToolItem).content).toBe("denied");
+    // A late toolError does not relabel the refusal either.
+    items = applyEvent(items, event({ id: "e3", type: "toolError", toolError: { toolCallId: "tc1", tool } }));
+    expect((items[0] as ToolItem).status).toBe("denied");
+  });
+
+  it("marks a call denied even when the denial event arrives after its result", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(items, event({ id: "e1", type: "toolResult", toolResult: { toolCallId: "tc1", tool } }));
+    items = applyEvent(items, event({ id: "e2", type: "toolDenied", toolDenied: { toolCallId: "tc1" } }));
+    expect((items[0] as ToolItem).status).toBe("denied");
+  });
+
+  it("still finishes an approved call normally", () => {
+    const steps: WidgetEvent[] = [
+      event({ id: "e1", type: "toolApprovalRequested", toolApprovalRequested: { toolCallId: "tc1", tool } }),
+      event({ id: "e2", type: "toolApproved", toolApproved: { toolCallId: "tc1" } }),
+      event({ id: "e3", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool } }),
+      event({ id: "e4", type: "toolResult", toolResult: { toolCallId: "tc1", tool, content: "ok" } }),
+    ];
+    const items = applyEvents([], steps);
+    expect((items[0] as ToolItem).status).toBe("done");
+    expect((items[0] as ToolItem).content).toBe("ok");
+  });
+
   it("lets a later terminal event replace an earlier one", () => {
     let items: TimelineItem[] = [];
     items = applyEvent(items, event({ id: "e1", type: "toolResult", toolResult: { toolCallId: "tc1", tool } }));

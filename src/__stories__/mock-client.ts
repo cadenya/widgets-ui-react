@@ -428,6 +428,9 @@ export const approvalAgent: MockAgent = async ({ emit, stream, sleep, waitForDec
   const decision = await waitForDecision(toolCallId);
   if (decision === "denied") {
     emit({ type: "toolDenied", toolDenied: { toolCallId } });
+    // The runtime records the refusal as the call's result too.
+    await sleep(200);
+    emit({ type: "toolResult", toolResult: { toolCallId, tool: TOOLS.cancelOrder } });
     await sleep(300);
     await stream("No problem — I've left the order as it is. Anything else?");
     return;

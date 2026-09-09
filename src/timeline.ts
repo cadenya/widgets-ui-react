@@ -150,16 +150,19 @@ function upsertById(items: TimelineItem[], item: MessageItem | NoticeItem): Time
  * more than once — a bare tool with alwaysSetResult emits toolResult before
  * toolCalled, and history replay re-delivers frames — so folding is ranked:
  * a lower-ranked status never overwrites a higher one, while the event's
- * tool reference, arguments, and content still enrich the item. Terminal
- * states share a rank, so among them the latest event wins.
+ * tool reference, arguments, and content still enrich the item. done and
+ * failed share a rank, so between them the latest event wins. denied ranks
+ * above both: the runtime records the visitor's refusal as a toolResult
+ * too (toolDenied, then toolResult for the same call), and that result
+ * must not relabel the call as finished.
  */
 const STATUS_RANK: Record<ToolStatus, number> = {
   approvalRequested: 0,
   approved: 1,
   running: 2,
-  denied: 3,
   done: 3,
   failed: 3,
+  denied: 4,
 };
 
 function upsertTool(

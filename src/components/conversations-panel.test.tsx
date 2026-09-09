@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { WidgetConversation, WidgetEvent } from "@cadenya/widgets";
 import { WidgetClientProvider } from "../context.js";
-import { createMockClient } from "../__stories__/mock-client.js";
+import { approvalAgent, createMockClient, TOOLS } from "../__stories__/mock-client.js";
 import type { ToolRenderProps } from "../tool-registry.js";
 import { ConversationsPanel } from "./conversations-panel.js";
 import { PageToolsProvider, usePageTool } from "../page-tools.js";
@@ -146,5 +146,55 @@ describe("ConversationsPanel toolPlacement=\"inline\"", () => {
     fireEvent.click(button);
     // The mock turns setToolCallContent into a toolResult event; it folds to done in place.
     await waitFor(() => expect(screen.getByTestId("submit").textContent).toBe("done"));
+  });
+});
+
+describe("ConversationsPanel denied tool calls", () => {
+  const APPROVAL_TOOL = { id: "tool_01APPROVAL", name: "Run approval demo" };
+
+  it("labels a denied call as denied after history reload, despite the trailing toolResult", async () => {
+    const at = "2026-08-14T00:00:00Z";
+    const base = (id: string) => ({ id, conversationId: "c1", createdAt: at });
+    const { client } = createMockClient({
+      latency: 0,
+      conversations: [conversation("c1")],
+      events: {
+        c1: [
+          { ...base("e1"), type: "userMessage", userMessage: { content: "Run the demo" } },
+          { ...base("e2"), type: "toolApprovalRequested", toolApprovalRequested: { toolCallId: "tc1", tool: APPROVAL_TOOL } },
+          { ...base("e3"), type: "toolDenied", toolDenied: { toolCallId: "tc1" } },
+          { ...base("e4"), type: "toolResult", toolResult: { toolCallId: "tc1", tool: APPROVAL_TOOL } },
+        ] as WidgetEvent[],
+      },
+    });
+    const { container } = render(
+      <WidgetClientProvider client={client}>
+        <ConversationsPanel />
+      </WidgetClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Conversation c1" }));
+    await waitFor(() => expect(container.querySelector(".cdny-tool")).not.toBeNull());
+    expect(container.querySelector(".cdny-tool")?.textContent).toContain("denied");
+    expect(container.querySelector(".cdny-tool-denied")).not.toBeNull();
+  });
+
+  it("keeps the denied label when the denial result arrives over the live stream", async () => {
+    const { client } = createMockClient({ latency: 0, thinkTime: 0, agent: approvalAgent });
+    // Inline placement keeps the chip on screen after the agent's reply.
+    const { container } = render(
+      <WidgetClientProvider client={client}>
+        <ConversationsPanel toolPlacement="inline" />
+      </WidgetClientProvider>,
+    );
+    fireEvent.change(await screen.findByPlaceholderText(/get started/i), { target: { value: "Cancel my order" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Deny" }, { timeout: 5000 }));
+    await waitFor(() => expect(container.querySelector(".cdny-tool-denied")).not.toBeNull());
+    // The agent's denial result and closing reply both stream in after the deny.
+    await screen.findByText(/left the order as it is/, {}, { timeout: 5000 });
+    const chip = container.querySelector(".cdny-tool");
+    expect(chip?.classList.contains("cdny-tool-denied")).toBe(true);
+    expect(chip?.textContent).toContain(`${TOOLS.cancelOrder.name} denied`);
+    expect(container.querySelector(".cdny-tool-done")).toBeNull();
   });
 });
