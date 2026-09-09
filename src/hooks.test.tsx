@@ -66,7 +66,7 @@ describe("useConversation(null)", () => {
     const { client, streams } = fakeClient({ c1: [event("e1", "hello")] });
     const { result, rerender } = renderHook((id: string | null) => useConversation(id), {
       wrapper: wrapperFor(client),
-      initialProps: null,
+      initialProps: null as string | null,
     });
     expect(result.current.loading).toBe(false);
 
@@ -109,5 +109,24 @@ describe("useConversation(null)", () => {
       await result.current.setToolCallContent("tc", "done");
     });
     expect(result.current.sending).toBe(false);
+  });
+});
+
+describe("useConversation async isolation", () => {
+  it("does not merge a late history page into a newly selected conversation", async () => {
+    const { client } = fakeClient({ c2: [event("e2", "current")] });
+    let resolve!: (page: { items: WidgetEvent[]; nextCursor?: string }) => void;
+    vi.mocked(client.conversations.listEvents).mockImplementationOnce(() =>
+      new Promise<{ items: WidgetEvent[]; nextCursor?: string }>((done) => { resolve = done; }) as ReturnType<typeof client.conversations.listEvents>,
+    );
+    const { result, rerender } = renderHook((id: string | null) => useConversation(id), {
+      wrapper: wrapperFor(client), initialProps: "c1" as string | null,
+    });
+    rerender("c2");
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => resolve({ items: [event("stale", "old")], nextCursor: "more" }));
+    expect(result.current.timeline.map((item) => item.id)).toEqual(["e2"]);
+    expect(client.conversations.listEvents).toHaveBeenCalledTimes(2);
+    expect(client.conversations.streamEvents).toHaveBeenCalledTimes(1);
   });
 });

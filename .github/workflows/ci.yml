@@ -15,6 +15,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run typecheck:tests
       - run: npm test
       # Evaluate the built package as a real Node module (publint + attw +
       # a bare Node import) — bundlers hide unspecified-ESM packaging bugs.

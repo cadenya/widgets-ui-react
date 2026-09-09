@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.storybook.json",
+  "include": ["src"],
+  "exclude": ["src/**/*.stories.tsx", "src/__stories__"]
+}
