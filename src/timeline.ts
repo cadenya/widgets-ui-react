@@ -145,6 +145,23 @@ function upsertById(items: TimelineItem[], item: MessageItem | NoticeItem): Time
   return items.map((existing, i) => (i === index ? item : existing));
 }
 
+/**
+ * A call's lifecycle only moves forward. Events can arrive out of order or
+ * more than once — a bare tool with alwaysSetResult emits toolResult before
+ * toolCalled, and history replay re-delivers frames — so folding is ranked:
+ * a lower-ranked status never overwrites a higher one, while the event's
+ * tool reference, arguments, and content still enrich the item. Terminal
+ * states share a rank, so among them the latest event wins.
+ */
+const STATUS_RANK: Record<ToolStatus, number> = {
+  approvalRequested: 0,
+  approved: 1,
+  running: 2,
+  denied: 3,
+  done: 3,
+  failed: 3,
+};
+
 function upsertTool(
   items: TimelineItem[],
   eventId: string,
@@ -156,17 +173,18 @@ function upsertTool(
   if (index === -1) {
     return [...items, { kind: "tool", id: eventId, toolCallId, createdAt, ...update }];
   }
-  return items.map((item, i) =>
-    i === index && item.kind === "tool"
-      ? {
-          ...item,
-          id: eventId,
-          ...update,
-          tool: update.tool ?? item.tool,
-          args: update.args ?? item.args,
-        }
-      : item,
-  );
+  return items.map((item, i) => {
+    if (i !== index || item.kind !== "tool") return item;
+    const regresses = STATUS_RANK[update.status] < STATUS_RANK[item.status];
+    return {
+      ...item,
+      id: eventId,
+      status: regresses ? item.status : update.status,
+      tool: update.tool ?? item.tool,
+      args: update.args ?? item.args,
+      content: update.content ?? item.content,
+    };
+  });
 }
 
 /**
