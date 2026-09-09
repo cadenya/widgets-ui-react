@@ -4,11 +4,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { ToolActivity } from "./tool-activity.js";
 import type { ToolItem, ToolStatus } from "../timeline.js";
 
-function item(status: ToolStatus): ToolItem {
+function item(status: ToolStatus, toolCallId = "tc1"): ToolItem {
   return {
     kind: "tool",
-    id: "evt_1",
-    toolCallId: "tc1",
+    id: `evt_${toolCallId}`,
+    toolCallId,
     tool: { id: "tool_1", name: "CancelOrder" },
     status,
     createdAt: "2026-08-14T00:00:00Z",
@@ -106,5 +106,54 @@ describe("ToolActivity approval controls", () => {
     fireEvent.click(deny());
     expect(onDeny).toHaveBeenCalledTimes(1);
     expect(deny().disabled).toBe(true);
+  });
+});
+
+describe("ToolActivity reused across tool calls (no per-call key)", () => {
+  it("does not carry one call's pending lock onto the next call", () => {
+    const onApprove = vi.fn(() => new Promise<void>(() => {}));
+    const { rerender } = render(<ToolActivity item={item("approvalRequested", "tcA")} onApprove={onApprove} />);
+    fireEvent.click(approve());
+    expect(approve().disabled).toBe(true);
+
+    rerender(<ToolActivity item={item("approvalRequested", "tcB")} onApprove={onApprove} />);
+    expect(approve().disabled).toBe(false);
+    expect(deny().disabled).toBe(false);
+    expect(screen.getByText(/wants to run/)).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+
+    fireEvent.click(approve());
+    expect(onApprove).toHaveBeenLastCalledWith("tcB");
+    expect(approve().disabled).toBe(true);
+  });
+
+  it("ignores a rejection from a call the instance no longer shows", async () => {
+    const first = deferred();
+    const onApprove = vi.fn(() => first.promise);
+    const { rerender } = render(<ToolActivity item={item("approvalRequested", "tcA")} onApprove={onApprove} />);
+    fireEvent.click(approve());
+    rerender(<ToolActivity item={item("approvalRequested", "tcB")} onApprove={onApprove} />);
+
+    await act(async () => {
+      first.reject(new Error("stale failure"));
+      await first.promise.catch(() => {});
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(approve().disabled).toBe(false);
+  });
+
+  it("does not carry one call's error onto the next call", async () => {
+    const first = deferred();
+    const onDeny = vi.fn(() => first.promise);
+    const { rerender } = render(<ToolActivity item={item("approvalRequested", "tcA")} onDeny={onDeny} />);
+    fireEvent.click(deny());
+    await act(async () => {
+      first.reject(new Error("network down"));
+      await first.promise.catch(() => {});
+    });
+    expect(screen.getByRole("alert")).toBeTruthy();
+
+    rerender(<ToolActivity item={item("approvalRequested", "tcB")} onDeny={onDeny} />);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
