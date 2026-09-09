@@ -79,7 +79,7 @@ type ThreadState = {
 };
 
 type ThreadAction =
-  | { type: "reset" }
+  | { type: "reset"; loading: boolean }
   | { type: "backfilled"; events: WidgetEvent[] }
   | { type: "event"; event: WidgetEvent }
   | { type: "error"; message: string };
@@ -87,7 +87,11 @@ type ThreadAction =
 function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
   switch (action.type) {
     case "reset":
-      return { timeline: [], loading: true, error: null };
+      // Already idle and empty: return the same state so React bails out.
+      if (!action.loading && !state.loading && !state.error && state.timeline.length === 0) {
+        return state;
+      }
+      return { timeline: [], loading: action.loading, error: null };
     case "backfilled":
       return { ...state, timeline: applyEvents(state.timeline, action.events), loading: false };
     case "event":
@@ -113,19 +117,29 @@ export interface UseConversationResult {
 /**
  * Loads a conversation's event history (all pages, oldest first), then keeps
  * it live over SSE, reconnecting with Last-Event-ID so nothing is missed.
+ *
+ * A null id is the idle "new conversation" state: an empty timeline, not
+ * loading, no error. Switching from a conversation to null tears down its
+ * stream and clears its timeline and error, so a composer bound to
+ * `loading` is usable for the first message.
  */
 export function useConversation(conversationId: string | null): UseConversationResult {
   const client = useWidgetClient();
-  const [state, dispatch] = useReducer(threadReducer, {
+  const [state, dispatch] = useReducer(threadReducer, conversationId, (id) => ({
     timeline: [],
-    loading: true,
+    loading: id != null,
     error: null,
-  });
+  }));
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (!conversationId) return;
-    dispatch({ type: "reset" });
+    if (!conversationId) {
+      // The previous effect's cleanup already aborted that conversation's
+      // stream; all that is left is to drop its state.
+      dispatch({ type: "reset", loading: false });
+      return;
+    }
+    dispatch({ type: "reset", loading: true });
 
     const controller = new AbortController();
 
