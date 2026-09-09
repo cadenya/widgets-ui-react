@@ -69,7 +69,7 @@ while the call is active — including bare tools the page executes itself:
 ```tsx
 <ConversationsPanel
   toolComponents={{
-    "external_id:askClarifyingQuestion": ({ toolCall, status, result, submit }) => (
+    "external_id:askClarifyingQuestion": ({ toolCall, status, args, result, submit }) => (
       /* collect input, then: */ <button onClick={() => submit("the answer")}>Send</button>
     ),
   }}
@@ -80,6 +80,12 @@ Keys are the tool's canonical `tool_…` id or your own external id (bare or as
 `external_id:<value>`; external id wins). `submit` posts
 `setToolCallContent` — the result reaches the conversation as a `toolResult`
 event and unblocks the agent.
+
+`args` carries the call's arguments and `result` the tool's output, each
+only when the workspace opted that tool into exposing it to widget sessions
+(argument exposure is a tool-set overlay setting; result sharing is
+per-tool). Both are `undefined` otherwise — treat them as untyped and
+validate before rendering.
 
 ## Custom layouts
 
