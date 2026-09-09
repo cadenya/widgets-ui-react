@@ -184,6 +184,31 @@ export const ToolApproval: Story = {
   },
 };
 
+export const ToolApprovalSlow: Story = {
+  name: "Tool approval, slow network",
+  render: (args) => (
+    <MockProvider seeded={false} agent={approvalAgent} latency={2500}>
+      <ConversationsPanel {...args} />
+      <Hint>
+        2.5s round trips: after Approve or Deny the chip reads “approving…”/“denying…” with both
+        controls locked until the decision event arrives.
+      </Hint>
+    </MockProvider>
+  ),
+  play: ToolApproval.play,
+};
+
+export const ToolApprovalFails: Story = {
+  name: "Tool approval, request fails",
+  render: (args) => (
+    <MockProvider seeded={false} agent={approvalAgent} decisionError="401 Unauthorized: widget session expired">
+      <ConversationsPanel {...args} />
+      <Hint>The decision request rejects: the chip reports the error and the controls come back for a retry.</Hint>
+    </MockProvider>
+  ),
+  play: ToolApproval.play,
+};
+
 export const AgentError: Story = {
   render: (args) => (
     <MockProvider seeded={false} agent={errorAgent}>

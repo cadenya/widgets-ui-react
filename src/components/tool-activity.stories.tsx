@@ -59,6 +59,34 @@ export const Done: Story = { args: { item: item("done") } };
 export const Failed: Story = { args: { item: item("failed") } };
 export const UnknownTool: Story = { args: { item: item("running", { tool: undefined }) } };
 
+const slow = (ms: number) => () => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Decision handlers that take a while — the chip shows the pending state and locks both controls. */
+export const SlowDecision: Story = {
+  name: "Approval, slow request",
+  args: {
+    item: item("approvalRequested", { tool: TOOLS.cancelOrder }),
+    onApprove: fn(slow(4000)),
+    onDeny: fn(slow(4000)),
+  },
+};
+
+/** The decision request fails: the chip reports it and the controls come back for a retry. */
+export const FailedDecision: Story = {
+  name: "Approval, request fails",
+  args: {
+    item: item("approvalRequested", { tool: TOOLS.cancelOrder }),
+    onApprove: fn(async () => {
+      await slow(800)();
+      throw new Error("widget session expired");
+    }),
+    onDeny: fn(async () => {
+      await slow(800)();
+      throw new Error("widget session expired");
+    }),
+  },
+};
+
 export const AllStatuses: Story = {
   render: (args) => (
     <>
