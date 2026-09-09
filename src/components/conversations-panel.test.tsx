@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { WidgetConversation, WidgetEvent } from "@cadenya/widgets";
 import { WidgetClientProvider } from "../context.js";
 import { approvalAgent, createMockClient, TOOLS } from "../__stories__/mock-client.js";
@@ -196,5 +196,33 @@ describe("ConversationsPanel denied tool calls", () => {
     expect(chip?.classList.contains("cdny-tool-denied")).toBe(true);
     expect(chip?.textContent).toContain(`${TOOLS.cancelOrder.name} denied`);
     expect(container.querySelector(".cdny-tool-done")).toBeNull();
+  });
+});
+
+
+describe("ConversationsPanel paginated history", () => {
+  it("does not execute a historical call whose result arrives on the next page", async () => {
+    const { client } = createMockClient({ latency: 0, conversations: [conversation("c1")] });
+    const history = historyWithCards("c1");
+    let resolve!: (page: { items: WidgetEvent[] }) => void;
+    vi.spyOn(client.conversations, "listEvents")
+      .mockResolvedValueOnce({ items: history.slice(0, 3), nextCursor: "page2" } as Awaited<ReturnType<typeof client.conversations.listEvents>>)
+      .mockImplementationOnce(() => new Promise<{ items: WidgetEvent[] }>((done) => { resolve = done; }) as ReturnType<typeof client.conversations.listEvents>);
+    const handler = vi.fn();
+    render(
+      <WidgetClientProvider client={client}>
+        <PageToolsProvider>
+          <PageHandler onCall={handler} />
+          <ConversationsPanel />
+        </PageToolsProvider>
+      </WidgetClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Conversation c1" }));
+    await waitFor(() => expect(client.conversations.listEvents).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Loading conversation…")).toBeTruthy();
+    expect(handler).not.toHaveBeenCalled();
+    await act(async () => resolve({ items: history.slice(3) }));
+    await screen.findByText("That's all of them.");
+    expect(handler).not.toHaveBeenCalled();
   });
 });

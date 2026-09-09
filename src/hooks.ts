@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useState } from "react";
-import type { WidgetConfig, WidgetConversation, WidgetEvent } from "@cadenya/widgets";
+import type { CadenyaWidgets, WidgetConfig, WidgetConversation, WidgetEvent } from "@cadenya/widgets";
 import { useWidgetClient } from "./context.js";
 import { applyEvent, applyEvents, type TimelineItem } from "./timeline.js";
+import { subscribeToConversation } from "./conversation-stream.js";
 
 /** Widget display metadata (name for the header). */
 export function useWidgetConfig(): WidgetConfig | null {
@@ -73,13 +74,15 @@ export function useConversations(): UseConversationsResult {
 }
 
 type ThreadState = {
+  client: CadenyaWidgets;
+  conversationId: string | null;
   timeline: TimelineItem[];
   loading: boolean;
   error: string | null;
 };
 
 type ThreadAction =
-  | { type: "reset"; loading: boolean }
+  | { type: "reset"; client: CadenyaWidgets; conversationId: string | null }
   | { type: "backfilled"; events: WidgetEvent[] }
   | { type: "event"; event: WidgetEvent }
   | { type: "error"; message: string };
@@ -87,11 +90,13 @@ type ThreadAction =
 function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
   switch (action.type) {
     case "reset":
-      // Already idle and empty: return the same state so React bails out.
-      if (!action.loading && !state.loading && !state.error && state.timeline.length === 0) {
-        return state;
-      }
-      return { timeline: [], loading: action.loading, error: null };
+      return {
+        client: action.client,
+        conversationId: action.conversationId,
+        timeline: [],
+        loading: action.conversationId != null,
+        error: null,
+      };
     case "backfilled":
       return { ...state, timeline: applyEvents(state.timeline, action.events), loading: false };
     case "event":
@@ -126,6 +131,8 @@ export interface UseConversationResult {
 export function useConversation(conversationId: string | null): UseConversationResult {
   const client = useWidgetClient();
   const [state, dispatch] = useReducer(threadReducer, conversationId, (id) => ({
+    client,
+    conversationId: id,
     timeline: [],
     loading: id != null,
     error: null,
@@ -133,70 +140,21 @@ export function useConversation(conversationId: string | null): UseConversationR
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (!conversationId) {
-      // The previous effect's cleanup already aborted that conversation's
-      // stream; all that is left is to drop its state.
-      dispatch({ type: "reset", loading: false });
-      return;
-    }
-    dispatch({ type: "reset", loading: true });
+    dispatch({ type: "reset", client, conversationId });
+    if (!conversationId) return;
 
     const controller = new AbortController();
 
-    (async () => {
-      // Backfill the full history so the stream only has to carry the tail.
-      let lastEventId: string | undefined;
-      try {
-        let cursor: string | undefined;
-        do {
-          const page = await client.conversations.listEvents(conversationId, { cursor });
-          dispatch({ type: "backfilled", events: page.items });
-          lastEventId = page.items.at(-1)?.id ?? lastEventId;
-          cursor = page.nextCursor;
-        } while (cursor);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        dispatch({ type: "error", message: err instanceof Error ? err.message : String(err) });
-        return;
-      }
-
-      // Live tail. The SDK owns mid-stream transport drops (auto-reconnect
-      // with Last-Event-ID resume) and skips open/ping frames, so everything
-      // yielded is a real widget event and iteration only ends on a clean
-      // server EOF or exhausted SDK retries. Those are ours: reconnect with
-      // the last seen event id, backing off when a connection ends without
-      // progress so a server that kills the stream at the same event can't
-      // induce a tight reconnect loop.
-      let attempts = 0;
-      while (!controller.signal.aborted) {
-        let progressed = false;
-        try {
-          const stream = await client.conversations.streamEvents(conversationId, {
-            signal: controller.signal,
-            lastEventId,
-          });
-          for await (const event of stream) {
-            progressed = true;
-            attempts = 0;
-            lastEventId = event.id;
-            dispatch({ type: "event", event });
-          }
-          // Skipped frames still advance the SDK's resume checkpoint.
-          lastEventId = stream.lastEventId ?? lastEventId;
-        } catch {
-          if (controller.signal.aborted) return;
-        }
-        if (controller.signal.aborted) return;
-        if (!progressed) {
-          attempts += 1;
-          if (attempts > 5) {
-            dispatch({ type: "error", message: "Lost connection to the conversation stream." });
-            return;
-          }
-        }
-        await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempts, 15000)));
-      }
-    })();
+    void subscribeToConversation({
+      client,
+      conversationId,
+      signal: controller.signal,
+      onHistory: (events) => dispatch({ type: "backfilled", events }),
+      onEvent: (event) => dispatch({ type: "event", event }),
+    }).catch((err: unknown) => {
+      if (controller.signal.aborted) return;
+      dispatch({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    });
 
     return () => controller.abort();
   }, [client, conversationId]);
@@ -239,10 +197,12 @@ export function useConversation(conversationId: string | null): UseConversationR
     [client, conversationId],
   );
 
+  // Do not expose the previous conversation during the render before effect cleanup.
+  const current = state.client === client && state.conversationId === conversationId;
   return {
-    timeline: state.timeline,
-    loading: state.loading,
-    error: state.error,
+    timeline: current ? state.timeline : [],
+    loading: current ? state.loading : conversationId != null,
+    error: current ? state.error : null,
     sending,
     send,
     approveToolCall,

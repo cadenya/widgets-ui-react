@@ -1,10 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { useConversation, useConversations, useWidgetConfig } from "../hooks.js";
-import { encodePageToolResult, usePageToolsStore } from "../page-tools.js";
+import { usePageToolExecution } from "../use-page-tool-execution.js";
 import { activeTools, type ToolItem } from "../timeline.js";
 import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry.js";
 import { Composer, type ComposerVariant } from "./composer.js";
@@ -106,7 +106,12 @@ export function ConversationsPanel({
     setSelectedId(conversation.id);
   };
 
-  const error = listError ?? threadError;
+  const pageToolError = usePageToolExecution(
+    timeline,
+    selectedId !== null && !threadLoading && !threadError,
+    setToolCallContent,
+  );
+  const error = listError ?? threadError ?? pageToolError;
   const tools = toolPlacement === "activity" ? activeTools(timeline) : [];
 
   // One tool call as its registered component (with the call's folded
@@ -132,36 +137,6 @@ export function ConversationsPanel({
     }
     return <ToolActivity item={item} onApprove={approveToolCall} onDeny={denyToolCall} />;
   };
-
-  // Page tools: execute pending bare calls whose tool has a registered
-  // handler (usePageTool under a shared PageToolsProvider) and submit the
-  // result. Only running calls fire — historical calls backfill with their
-  // toolResult and fold to done — and each toolCallId executes once per
-  // mount; a still-pending call after a reload correctly re-fires.
-  const pageTools = usePageToolsStore();
-  const executedRef = useRef(new Set<string>());
-  useEffect(() => {
-    if (!pageTools) return;
-    for (const item of activeTools(timeline)) {
-      if (item.status !== "running" || !item.tool) continue;
-      if (executedRef.current.has(item.toolCallId)) continue;
-      const handler = pageTools.resolve(item.tool);
-      if (!handler) continue;
-      executedRef.current.add(item.toolCallId);
-      const { toolCallId, tool, args } = item;
-      (async () => {
-        try {
-          const result = await handler({ toolCallId, tool, args });
-          await setToolCallContent(toolCallId, encodePageToolResult(result));
-        } catch (err) {
-          await setToolCallContent(
-            toolCallId,
-            JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
-          );
-        }
-      })();
-    }
-  }, [timeline, pageTools, setToolCallContent]);
 
   return (
     <Flex
@@ -209,7 +184,7 @@ export function ConversationsPanel({
 
       <Flex className="cdny-panel-main" direction="column" flexGrow="1" minWidth="0">
         {error && (
-          <Callout.Root color="red" size="1" m="3" mb="0" className="cdny-error">
+          <Callout.Root role="alert" color="red" size="1" m="3" mb="0" className="cdny-error">
             <Callout.Icon>
               <ExclamationTriangleIcon />
             </Callout.Icon>
