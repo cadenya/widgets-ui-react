@@ -69,6 +69,8 @@ export interface MockClientOptions {
   agent?: MockAgent;
   /** Delay before the agent starts answering (thinking time), in ms. */
   thinkTime?: number;
+  /** Make approveToolCall()/denyToolCall() reject with this message. */
+  decisionError?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,11 +295,13 @@ export function createMockClient(options: MockClientOptions = {}) {
       },
       approveToolCall: async (_id: string, { toolCallId }: { toolCallId: string }) => {
         await net();
+        if (options.decisionError) throw new Error(options.decisionError);
         waiters.decisions.get(toolCallId)?.("approved");
         waiters.decisions.delete(toolCallId);
       },
       denyToolCall: async (_id: string, { toolCallId }: { toolCallId: string }) => {
         await net();
+        if (options.decisionError) throw new Error(options.decisionError);
         waiters.decisions.get(toolCallId)?.("denied");
         waiters.decisions.delete(toolCallId);
       },
