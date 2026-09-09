@@ -87,13 +87,32 @@ only when the workspace opted that tool into exposing it to widget sessions
 per-tool). Both are `undefined` otherwise — treat them as untyped and
 validate before rendering.
 
+### Persistent tool cards
+
+By default a tool's component lives in the activity bar above the composer
+and retires when the agent's next message arrives. For content that should
+stay — resource cards, charts, anything the visitor will scroll back to —
+render tool calls inline:
+
+```tsx
+<ConversationsPanel toolPlacement="inline" toolComponents={{ display_resource: ResourceCard }} />
+```
+
+Every tool call then renders in the thread at its position (registered
+component or the default chip), persists after the reply, and is restored
+with its `args` and `result` when the conversation is reopened. Nothing
+re-executes on reload — page tools only fire for calls still running, and
+bare tools that already have a result fold to `done`.
+
 ## Custom layouts
 
 `ConversationsPanel` is the batteries-included surface. For your own layout,
 compose the exported pieces: `ConversationList`, `MessageThread`, `Composer`,
 `ToolActivity`, the hooks (`useConversations`, `useConversation`,
 `useWidgetConfig`), the event→timeline projection (`applyEvents`,
-`activeTools`, `awaitingReply`), and `createAuthFetch`.
+`activeTools`, `awaitingReply`), and `createAuthFetch`. `MessageThread`
+takes a `renderTool={(item) => …}` callback to draw tool items inline from
+their folded state (`status`, `tool`, `args`, `content`).
 
 ## Develop
 

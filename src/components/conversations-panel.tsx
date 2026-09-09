@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { useConversation, useConversations, useWidgetConfig } from "../hooks.js";
 import { encodePageToolResult, usePageToolsStore } from "../page-tools.js";
-import { activeTools } from "../timeline.js";
+import { activeTools, type ToolItem } from "../timeline.js";
 import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry.js";
 import { Composer, type ComposerVariant } from "./composer.js";
 import { ConversationList } from "./conversation-list.js";
@@ -22,6 +22,16 @@ export interface ConversationsPanelProps {
    */
   toolComponents?: ToolComponentRegistry;
   /**
+   * Where tool calls render. "activity" (default): the in-flight run shows
+   * in a bar above the composer and clears when the agent's next message
+   * arrives. "inline": every tool call — a registered component or the
+   * default chip — renders in the thread at its position, persists after
+   * the reply, and comes back with its arguments and result when the
+   * conversation is reopened. Nothing re-executes on reload: page tools
+   * only fire for calls still running.
+   */
+  toolPlacement?: ToolPlacement;
+  /**
    * Composer style: "bar" (default) is a full-width footer; "pill" fuses the
    * input and send button into one rounded capsule; "floating" lifts the
    * capsule onto a shadowed card over a matte main area.
@@ -36,6 +46,8 @@ export interface ConversationsPanelProps {
   /** Additional class for the panel root (sizing, positioning). */
   className?: string;
 }
+
+export type ToolPlacement = "activity" | "inline";
 
 export interface BubbleColors {
   user?: string;
@@ -64,6 +76,7 @@ function bubbleColorStyle(colors: BubbleColors | undefined): Record<string, stri
  */
 export function ConversationsPanel({
   toolComponents = {},
+  toolPlacement = "activity",
   composer = "bar",
   bubbleColors,
   className,
@@ -94,7 +107,31 @@ export function ConversationsPanel({
   };
 
   const error = listError ?? threadError;
-  const tools = activeTools(timeline);
+  const tools = toolPlacement === "activity" ? activeTools(timeline) : [];
+
+  // One tool call as its registered component (with the call's folded
+  // state and a submit wired to setToolCallContent) or the default chip.
+  // The custom wrapper's class names the placement, for embedder CSS.
+  const renderToolItem = (item: ToolItem, placement: ToolPlacement): ReactNode => {
+    const Custom = resolveToolComponent(toolComponents, item.tool);
+    if (Custom && item.tool) {
+      return (
+        <Box
+          className={placement === "activity" ? "cdny-activity-custom" : "cdny-thread-tool-custom"}
+          width="100%"
+        >
+          <Custom
+            toolCall={{ toolCallId: item.toolCallId, tool: item.tool }}
+            status={item.status}
+            args={item.args}
+            result={item.content}
+            submit={(content) => setToolCallContent(item.toolCallId, content)}
+          />
+        </Box>
+      );
+    }
+    return <ToolActivity item={item} onApprove={approveToolCall} onDeny={denyToolCall} />;
+  };
 
   // Page tools: execute pending bare calls whose tool has a registered
   // handler (usePageTool under a shared PageToolsProvider) and submit the
@@ -180,7 +217,11 @@ export function ConversationsPanel({
           </Callout.Root>
         )}
         {selectedId ? (
-          <MessageThread timeline={timeline} loading={threadLoading} />
+          <MessageThread
+            timeline={timeline}
+            loading={threadLoading}
+            renderTool={toolPlacement === "inline" ? (item) => renderToolItem(item, "inline") : undefined}
+          />
         ) : (
           <Flex className="cdny-thread cdny-thread-empty" flexGrow="1" align="center" justify="center">
             <Box as="span" style={{ color: "var(--gray-a10)" }}>
@@ -199,30 +240,9 @@ export function ConversationsPanel({
             aria-label="Tool activity"
             style={{ borderTop: "1px solid var(--gray-a6)", background: "var(--gray-a2)" }}
           >
-            {tools.map((item) => {
-              const Custom = resolveToolComponent(toolComponents, item.tool);
-              if (Custom && item.tool) {
-                return (
-                  <Box key={item.toolCallId} className="cdny-activity-custom" width="100%">
-                    <Custom
-                      toolCall={{ toolCallId: item.toolCallId, tool: item.tool }}
-                      status={item.status}
-                      args={item.args}
-                      result={item.content}
-                      submit={(content) => setToolCallContent(item.toolCallId, content)}
-                    />
-                  </Box>
-                );
-              }
-              return (
-                <ToolActivity
-                  key={item.toolCallId}
-                  item={item}
-                  onApprove={approveToolCall}
-                  onDeny={denyToolCall}
-                />
-              );
-            })}
+            {tools.map((item) => (
+              <Fragment key={item.toolCallId}>{renderToolItem(item, "activity")}</Fragment>
+            ))}
           </Flex>
         )}
         <Composer

@@ -37,6 +37,7 @@ export {
   ConversationsPanel,
   type BubbleColors,
   type ConversationsPanelProps,
+  type ToolPlacement,
 } from "./components/conversations-panel.js";
 export { ConversationList, type ConversationListProps } from "./components/conversation-list.js";
 export { MessageThread, type MessageThreadProps } from "./components/message-thread.js";

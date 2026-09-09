@@ -13,10 +13,12 @@ import {
   echoAgent,
   errorAgent,
   pageToolAgent,
+  resourceCardAgent,
   toolAgent,
   TOOLS,
+  type ResourceCardArgs,
 } from "../__stories__/mock-client.js";
-import { FAKER_CONVERSATION } from "../__stories__/fixtures.js";
+import { CARDS_CONVERSATION, FAKER_CONVERSATION } from "../__stories__/fixtures.js";
 
 const meta = {
   title: "Widget/ConversationsPanel",
@@ -34,6 +36,7 @@ const meta = {
   args: { composer: "bar" },
   argTypes: {
     composer: { control: "inline-radio", options: ["bar", "pill", "floating"] },
+    toolPlacement: { control: "inline-radio", options: ["activity", "inline"] },
     bubbleColors: { control: "object" },
     toolComponents: { table: { disable: true } },
     className: { table: { disable: true } },
@@ -246,6 +249,78 @@ export const CustomToolComponent: Story = {
     await expect(
       await within(canvasElement).findByText(/Pick a date/, {}, { timeout: 5000 }),
     ).toBeInTheDocument();
+  },
+};
+
+/** A persistent card for a display tool, rendered from its exposed arguments. */
+function ResourceCardTool({ args, status }: ToolRenderProps) {
+  const card = (args ?? null) as ResourceCardArgs | null;
+  if (!card?.name) {
+    return (
+      <Card size="1">
+        <Text size="1" color="gray">
+          Resource data unavailable — is argument exposure enabled for this tool set?
+        </Text>
+      </Card>
+    );
+  }
+  return (
+    <Card size="2" style={{ maxWidth: "28rem" }}>
+      <Flex direction="column" gap="1">
+        <Flex justify="between" align="center">
+          <Text size="1" color="gray" style={{ textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            {card.resource_type}
+          </Text>
+          <Text size="1" color={status === "done" ? "green" : "gray"}>
+            {status}
+          </Text>
+        </Flex>
+        <Text size="3" weight="bold">
+          {card.name}
+        </Text>
+        {card.description && <Text size="2">{card.description}</Text>}
+        <Text size="1" color="gray">
+          {card.id}
+        </Text>
+        {card.labels && (
+          <Flex gap="1" wrap="wrap">
+            {Object.entries(card.labels).map(([k, v]) => (
+              <Text key={k} size="1" style={{ padding: "1px 6px", borderRadius: "999px", background: "var(--gray-a3)" }}>
+                {k}: {v}
+              </Text>
+            ))}
+          </Flex>
+        )}
+      </Flex>
+    </Card>
+  );
+}
+
+export const InlineToolCards: Story = {
+  name: "Inline tool cards (persistent)",
+  render: (args) => (
+    <MockProvider agent={resourceCardAgent}>
+      <ConversationsPanel
+        {...args}
+        toolPlacement="inline"
+        toolComponents={{ [TOOLS.displayResource.externalId]: ResourceCardTool }}
+      />
+      <Hint>
+        <code>toolPlacement="inline"</code>: tool calls render in the thread at their position and
+        stay after the agent replies. Open “Show my agents as cards” — a finished conversation — to
+        see cards restored from history with their arguments, or send “show my agents as cards” to
+        watch new ones arrive. Other tools fall back to the default chip, also inline.
+      </Hint>
+    </MockProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", { name: CARDS_CONVERSATION.title! }, { timeout: 5000 }),
+    );
+    await expect(await canvas.findByText("Cadenyaception", {}, { timeout: 5000 })).toBeVisible();
+    // The reply after the cards did not clear them.
+    await expect(canvas.getByText(/both of them/)).toBeVisible();
   },
 };
 
