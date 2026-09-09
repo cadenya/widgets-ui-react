@@ -346,7 +346,39 @@ export const TOOLS = {
   setTheme: { id: "tool_01MOCKSETTHEME000000000000", externalId: "set-theme", name: "SetTheme" },
   /** A bare tool with a custom renderer that gathers input from the visitor. */
   pickDate: { id: "tool_01MOCKPICKDATE000000000000", externalId: "pick-date", name: "PickDate" },
+  /** A bare, alwaysSetResult display tool: its exposed arguments are the card. */
+  displayResource: {
+    id: "tool_01MOCKDISPLAYRESOURCE00000",
+    externalId: "display_resource",
+    name: "DisplayResource",
+  },
 } satisfies Record<string, WidgetToolReference>;
+
+/** Exposed arguments for a DisplayResource call. */
+export interface ResourceCardArgs {
+  name: string;
+  resource_type: string;
+  id: string;
+  description?: string;
+  labels?: Record<string, string>;
+}
+
+export const RESOURCE_CARDS: ResourceCardArgs[] = [
+  {
+    name: "Faker",
+    resource_type: "agent",
+    id: "agent_01MOCKFAKER000000000000000",
+    description: "Generates realistic sample data on request.",
+    labels: { env: "demo", team: "growth" },
+  },
+  {
+    name: "Cadenyaception",
+    resource_type: "agent",
+    id: "agent_01MOCKCADENYACEPTION000000",
+    description: "Browses the workspace's own resources.",
+    labels: { env: "demo" },
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Scripted agents
@@ -449,6 +481,29 @@ export const customToolAgent: MockAgent = async ({ emit, stream, sleep, waitForT
   await stream(`Booked for **${content}**. You'll get a confirmation email shortly.`);
 };
 
+/**
+ * Presents resource cards through a bare display tool that acknowledges
+ * itself (alwaysSetResult), then replies — the cards are meant to outlive
+ * the reply, so pair with toolPlacement="inline".
+ */
+export const resourceCardAgent: MockAgent = async ({ emit, stream, sleep, newToolCallId }) => {
+  await stream("Here are your agents.");
+  for (const card of RESOURCE_CARDS) {
+    const toolCallId = newToolCallId();
+    emit({
+      type: "toolCalled",
+      toolCalled: { toolCallId, tool: TOOLS.displayResource, arguments: card } as never,
+    });
+    await sleep(250);
+    emit({
+      type: "toolResult",
+      toolResult: { toolCallId, tool: TOOLS.displayResource, content: { presented: true } },
+    });
+  }
+  await sleep(300);
+  await stream("That's both of them. Want details on either?");
+};
+
 /** Fails mid-run. */
 export const errorAgent: MockAgent = async ({ emit, stream, sleep, newToolCallId }) => {
   await stream("Let me check on that.");
@@ -464,7 +519,8 @@ export const errorAgent: MockAgent = async ({ emit, stream, sleep, newToolCallId
  * Keyword-routed demo agent so one story can show every flow:
  *   "cancel"  → approval flow      "look up" / "order" → tool run
  *   "theme"/"dark"/"light" → page tool   "book"/"date" → custom tool component
- *   "error"/"fail" → error notice   anything else → markdown echo
+ *   "card"/"resource" → resource cards    "error"/"fail" → error notice
+ *   anything else → markdown echo
  */
 export const demoAgent: MockAgent = async (ctx) => {
   const m = ctx.message.toLowerCase();
@@ -472,6 +528,7 @@ export const demoAgent: MockAgent = async (ctx) => {
   if (/error|fail|break/.test(m)) return errorAgent(ctx);
   if (/theme|dark|light|accent/.test(m)) return pageToolAgent(ctx);
   if (/book|date|schedule/.test(m)) return customToolAgent(ctx);
+  if (/card|resource|agents/.test(m)) return resourceCardAgent(ctx);
   if (/look ?up|order|track|status/.test(m)) return toolAgent(ctx);
   return echoAgent(ctx);
 };

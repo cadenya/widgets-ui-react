@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Flex } from "@radix-ui/themes";
 import { MessageThread } from "./message-thread.js";
+import { ToolActivity } from "./tool-activity.js";
 import type { TimelineItem } from "../timeline.js";
-import { FAKER_TIMELINE, MARKDOWN_KITCHEN_SINK } from "../__stories__/fixtures.js";
+import { CARDS_EVENTS, FAKER_TIMELINE, MARKDOWN_KITCHEN_SINK } from "../__stories__/fixtures.js";
+import { applyEvents } from "../timeline.js";
 
 const meta = {
   title: "Components/MessageThread",
@@ -11,8 +13,8 @@ const meta = {
     docs: {
       description: {
         component:
-          "Renders a timeline (see `applyEvents`) as bubbles and notices. Tool items are not shown inline; " +
-          "they live in the panel's activity bar.",
+          "Renders a timeline (see `applyEvents`) as bubbles and notices. Tool items are skipped unless " +
+          "`renderTool` is given, in which case they render inline at their position and persist.",
       },
     },
   },
@@ -138,6 +140,22 @@ export const Notices: Story = {
       msg("user", "Never mind."),
       notice("cancelled"),
     ],
+  },
+};
+
+export const InlineTools: Story = {
+  name: "Inline tools (renderTool)",
+  args: {
+    timeline: applyEvents([], CARDS_EVENTS),
+    renderTool: (item) => <ToolActivity item={item} />,
+  },
+};
+
+export const FakerConversationWithTools: Story = {
+  name: "Faker conversation, tools inline",
+  args: {
+    timeline: FAKER_TIMELINE,
+    renderTool: (item) => <ToolActivity item={item} />,
   },
 };
 

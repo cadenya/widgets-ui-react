@@ -134,6 +134,20 @@
   animation: cdny-fade-in 0.15s ease-out;
 }
 
+/* Inline tool calls (MessageThread renderTool / toolPlacement="inline"):
+ * the default chip sits at the assistant's edge, a custom component gets
+ * the full row. */
+
+.cdny-thread-tool {
+  align-self: stretch;
+  max-width: 100%;
+  animation: cdny-fade-in 0.15s ease-out;
+}
+
+.cdny-thread-tool > .cdny-tool {
+  display: inline-flex;
+}
+
 @keyframes cdny-fade-in {
   from {
     opacity: 0;
