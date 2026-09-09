@@ -136,6 +136,96 @@ describe("tool call lifecycle folding", () => {
   });
 });
 
+describe("out-of-order and duplicate tool events", () => {
+  const tool = { id: "tool_1", name: "DisplayResource", externalId: "display_resource" };
+  const args = { name: "Faker", resource_type: "agent" };
+
+  it("keeps a finished call done when toolCalled arrives after toolResult", () => {
+    // alwaysSetResult bare tools acknowledge before the call event lands.
+    let items: TimelineItem[] = [];
+    items = applyEvent(
+      items,
+      event({ id: "e1", type: "toolResult", toolResult: { toolCallId: "tc1", tool, content: "ok" } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("done");
+    items = applyEvent(
+      items,
+      event({ id: "e2", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool, arguments: args } }),
+    );
+    expect(items).toHaveLength(1);
+    const item = items[0] as ToolItem;
+    expect(item.status).toBe("done");
+    // The late start event still enriches the item.
+    expect(item.args).toEqual(args);
+    expect(item.content).toBe("ok");
+    expect(item.tool).toEqual(tool);
+  });
+
+  it("keeps a failed call failed when toolCalled arrives after toolError", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(items, event({ id: "e1", type: "toolError", toolError: { toolCallId: "tc1", tool } }));
+    items = applyEvent(
+      items,
+      event({ id: "e2", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool, arguments: args } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("failed");
+    expect((items[0] as ToolItem).args).toEqual(args);
+  });
+
+  it("does not regress approved or running calls on replayed earlier events", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(
+      items,
+      event({ id: "e1", type: "toolApprovalRequested", toolApprovalRequested: { toolCallId: "tc1", tool } }),
+    );
+    items = applyEvent(items, event({ id: "e2", type: "toolApproved", toolApproved: { toolCallId: "tc1" } }));
+    items = applyEvent(
+      items,
+      event({ id: "e1", type: "toolApprovalRequested", toolApprovalRequested: { toolCallId: "tc1", tool } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("approved");
+    items = applyEvent(items, event({ id: "e3", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool } }));
+    items = applyEvent(items, event({ id: "e2", type: "toolApproved", toolApproved: { toolCallId: "tc1" } }));
+    expect((items[0] as ToolItem).status).toBe("running");
+  });
+
+  it("is idempotent under duplicate events and keeps content across them", () => {
+    const steps: WidgetEvent[] = [
+      event({ id: "e1", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool, arguments: args } }),
+      event({ id: "e2", type: "toolResult", toolResult: { toolCallId: "tc1", tool, content: { ok: true } } }),
+    ];
+    const once = applyEvents([], steps);
+    const twice = applyEvents(once, steps);
+    expect(twice).toEqual(once);
+    expect((twice[0] as ToolItem).status).toBe("done");
+    expect((twice[0] as ToolItem).args).toEqual(args);
+    expect((twice[0] as ToolItem).content).toEqual({ ok: true });
+  });
+
+  it("lets a later terminal event replace an earlier one", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(items, event({ id: "e1", type: "toolResult", toolResult: { toolCallId: "tc1", tool } }));
+    items = applyEvent(items, event({ id: "e2", type: "toolError", toolError: { toolCallId: "tc1", tool } }));
+    expect((items[0] as ToolItem).status).toBe("failed");
+  });
+
+  it("still walks the normal call-before-result order", () => {
+    let items: TimelineItem[] = [];
+    items = applyEvent(
+      items,
+      event({ id: "e1", type: "toolCalled", toolCalled: { toolCallId: "tc1", tool, arguments: args } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("running");
+    items = applyEvent(
+      items,
+      event({ id: "e2", type: "toolResult", toolResult: { toolCallId: "tc1", tool, content: "ok" } }),
+    );
+    expect((items[0] as ToolItem).status).toBe("done");
+    expect((items[0] as ToolItem).args).toEqual(args);
+    expect((items[0] as ToolItem).content).toBe("ok");
+  });
+});
+
 describe("tool call arguments", () => {
   const tool = { id: "tool_1", name: "SetModel" };
 
