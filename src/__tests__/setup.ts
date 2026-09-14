@@ -6,8 +6,8 @@ import { cleanup } from "@testing-library/react";
 afterEach(cleanup);
 
 /**
- * DOM shims for component tests (jsdom lacks these; Radix ScrollArea and
- * the thread's auto-scroll expect them to exist).
+ * DOM shims for component tests (jsdom lacks ResizeObserver, which Radix
+ * ScrollArea expects to exist).
  */
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class {
@@ -15,7 +15,4 @@ if (typeof globalThis.ResizeObserver === "undefined") {
     unobserve() {}
     disconnect() {}
   } as unknown as typeof ResizeObserver;
-}
-if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => {};
 }

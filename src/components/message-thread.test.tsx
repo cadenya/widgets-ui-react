@@ -62,6 +62,23 @@ describe("MessageThread empty messages", () => {
   });
 });
 
+describe("MessageThread auto-scroll", () => {
+  it("scrolls the conversation viewport to the bottom when a message is appended", () => {
+    const { container, rerender } = render(<MessageThread timeline={[msg("u1", "user", "hi")]} />);
+    const viewport = container.querySelector<HTMLElement>(".rt-ScrollAreaViewport")!;
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 640 });
+    viewport.scrollTop = 120;
+
+    rerender(
+      <MessageThread
+        timeline={[msg("u1", "user", "hi"), msg("a1", "assistant", "Hello there")]}
+      />,
+    );
+
+    expect(viewport.scrollTop).toBe(640);
+  });
+});
+
 function tool(toolCallId: string, status: ToolItem["status"], args?: unknown): ToolItem {
   return {
     kind: "tool",
