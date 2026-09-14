@@ -41,7 +41,7 @@ export function MessageThread({ timeline, loading, renderTool }: MessageThreadPr
   useEffect(() => {
     const viewport = viewportRef.current;
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
-  }, [timeline]);
+  }, [timeline, loading]);
 
   if (loading) {
     return (

@@ -63,19 +63,53 @@ describe("MessageThread empty messages", () => {
 });
 
 describe("MessageThread auto-scroll", () => {
-  it("scrolls the conversation viewport to the bottom when a message is appended", () => {
-    const { container, rerender } = render(<MessageThread timeline={[msg("u1", "user", "hi")]} />);
+  it("scrolls only the conversation viewport when a message is appended", () => {
+    const renderThread = (timeline: TimelineItem[]) => (
+      <div data-testid="page">
+        <MessageThread timeline={timeline} />
+      </div>
+    );
+    const { container, getByTestId, rerender } = render(
+      renderThread([msg("u1", "user", "hi")]),
+    );
+    const page = getByTestId("page");
     const viewport = container.querySelector<HTMLElement>(".rt-ScrollAreaViewport")!;
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 640 });
+    page.scrollTop = 40;
+    document.documentElement.scrollTop = 80;
     viewport.scrollTop = 120;
 
     rerender(
-      <MessageThread
-        timeline={[msg("u1", "user", "hi"), msg("a1", "assistant", "Hello there")]}
-      />,
+      renderThread([msg("u1", "user", "hi"), msg("a1", "assistant", "Hello there")]),
     );
 
     expect(viewport.scrollTop).toBe(640);
+    expect(page.scrollTop).toBe(40);
+    expect(document.documentElement.scrollTop).toBe(80);
+  });
+
+  it("scrolls after loading finishes when the timeline reference is unchanged", () => {
+    const timeline = [msg("u1", "user", "Earlier message")];
+    const scrollHeight = Object.getOwnPropertyDescriptor(Element.prototype, "scrollHeight")!;
+    Object.defineProperty(Element.prototype, "scrollHeight", {
+      ...scrollHeight,
+      get() {
+        return this instanceof HTMLElement && this.classList.contains("rt-ScrollAreaViewport")
+          ? 640
+          : scrollHeight.get!.call(this);
+      },
+    });
+
+    try {
+      const { container, rerender } = render(<MessageThread timeline={timeline} loading />);
+
+      rerender(<MessageThread timeline={timeline} loading={false} />);
+
+      const viewport = container.querySelector<HTMLElement>(".rt-ScrollAreaViewport")!;
+      expect(viewport.scrollTop).toBe(640);
+    } finally {
+      Object.defineProperty(Element.prototype, "scrollHeight", scrollHeight);
+    }
   });
 });
 
