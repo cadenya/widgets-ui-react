@@ -1,10 +1,16 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { IconButton } from "@radix-ui/themes";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 
 export type ComposerVariant = "bar" | "pill" | "floating";
+
+function resizeInput(input: HTMLTextAreaElement) {
+  input.style.height = "auto";
+  const border = input.offsetHeight - input.clientHeight;
+  input.style.height = `${input.scrollHeight + border}px`;
+}
 
 export interface ComposerProps {
   onSend: (message: string) => Promise<void> | void;
@@ -23,8 +29,30 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
   const busy = disabled || pending;
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    resizeInput(input);
+  }, [draft]);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input || typeof ResizeObserver === "undefined") return;
+    let previousWidth: number | undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      // Changing height also notifies observers; only width changes rewrap text.
+      if (!entry || entry.contentRect.width === previousWidth) return;
+      previousWidth = entry.contentRect.width;
+      resizeInput(input);
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, []);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -55,6 +83,7 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
     <>
       <form className={`cdny-composer cdny-composer-${variant}`} onSubmit={submit}>
         <textarea
+          ref={inputRef}
           className="cdny-composer-input"
           rows={1}
           value={draft}
