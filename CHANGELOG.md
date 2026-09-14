@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/cadenya/widgets-ui-react/compare/v0.2.0...v0.2.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* normalize missing assistant message content ([#15](https://github.com/cadenya/widgets-ui-react/issues/15)) ([43fb29b](https://github.com/cadenya/widgets-ui-react/commit/43fb29b7e55adac66aad19651eaeb12ecb82ad80))
+
 ## [0.2.0](https://github.com/cadenya/widgets-ui-react/compare/v0.1.0...v0.2.0) (2026-09-09)
 
 
