@@ -36,11 +36,12 @@ export interface MessageThreadProps {
  * appears.
  */
 export function MessageThread({ timeline, loading, renderTool }: MessageThreadProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [timeline]);
+    const viewport = viewportRef.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [timeline, loading]);
 
   if (loading) {
     return (
@@ -51,7 +52,7 @@ export function MessageThread({ timeline, loading, renderTool }: MessageThreadPr
   }
 
   return (
-    <ScrollArea scrollbars="vertical" className="cdny-thread-scroll" style={{ flexGrow: 1 }}>
+    <ScrollArea ref={viewportRef} scrollbars="vertical" className="cdny-thread-scroll" style={{ flexGrow: 1 }}>
       <Flex className="cdny-thread" direction="column" gap="2" p="4">
         {timeline.map((item) => {
           switch (item.kind) {
@@ -88,7 +89,6 @@ export function MessageThread({ timeline, loading, renderTool }: MessageThreadPr
             <span />
           </div>
         )}
-        <div ref={bottomRef} />
       </Flex>
     </ScrollArea>
   );
