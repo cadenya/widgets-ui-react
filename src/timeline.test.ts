@@ -72,11 +72,26 @@ describe("applyEvents over a real conversation log", () => {
 });
 
 describe("assistant streaming snapshots", () => {
+  it.each([
+    ["omitted", {}],
+    ["null", { content: null }],
+    ["empty", { content: "" }],
+    ["whitespace", { content: " \n\t " }],
+  ])("keeps %s content as a string", (_label, assistantMessage) => {
+    const items = applyEvents(
+      [],
+      [event({ id: "e1", type: "assistantMessage", assistantMessage })],
+    );
+    expect((items[0] as MessageItem).content).toBe(
+      "content" in assistantMessage ? (assistantMessage.content ?? "") : "",
+    );
+  });
+
   it("replaces content when the same event id is re-emitted", () => {
     let items: TimelineItem[] = [];
     items = applyEvent(
       items,
-      event({ id: "e1", type: "assistantMessage", assistantMessage: { content: "Hel" } }),
+      event({ id: "e1", type: "assistantMessage", assistantMessage: {} }),
     );
     items = applyEvent(
       items,

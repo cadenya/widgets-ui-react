@@ -75,7 +75,9 @@ export function applyEvent(items: TimelineItem[], event: WidgetEvent): TimelineI
         kind: "message",
         id: event.id,
         role: "assistant",
-        content: event.assistantMessage.content,
+        // Tool-only assistant events may omit or null content on the wire,
+        // despite the generated SDK type declaring it as a string.
+        content: event.assistantMessage.content ?? "",
         createdAt: event.createdAt,
       });
 

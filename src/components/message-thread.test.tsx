@@ -16,12 +16,12 @@ function event(partial: Record<string, unknown>): WidgetEvent {
 const BUBBLE = ".cdny-bubble:not(.cdny-typing)";
 
 describe("MessageThread empty messages", () => {
-  it("renders no bubble for a tool-only assistant message", () => {
-    // An assistant turn that only calls tools: empty content, then the tool.
+  it("renders no empty bubble but preserves a tool card when assistant content is omitted", () => {
+    // An assistant turn that only calls tools: omitted content, then the tool.
     let timeline: TimelineItem[] = [msg("u1", "user", "Show me a demo resource card")];
     timeline = applyEvent(
       timeline,
-      event({ id: "a1", type: "assistantMessage", assistantMessage: { content: "" } }),
+      event({ id: "a1", type: "assistantMessage", assistantMessage: {} }),
     );
     timeline = applyEvent(
       timeline,
@@ -31,10 +31,13 @@ describe("MessageThread empty messages", () => {
         toolCalled: { toolCallId: "tc1", tool: { id: "tool_1", name: "DisplayResource" } },
       }),
     );
-    const { container } = render(<MessageThread timeline={timeline} />);
+    const { container } = render(
+      <MessageThread timeline={timeline} renderTool={() => <span data-testid="card">Resource</span>} />,
+    );
     const bubbles = container.querySelectorAll(BUBBLE);
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].classList.contains("cdny-bubble-user")).toBe(true);
+    expect(container.querySelector('[data-testid="card"]')?.textContent).toBe("Resource");
   });
 
   it("renders no bubble for whitespace-only content", () => {
