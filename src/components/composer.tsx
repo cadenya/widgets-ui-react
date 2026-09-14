@@ -6,6 +6,12 @@ import { PaperPlaneIcon } from "@radix-ui/react-icons";
 
 export type ComposerVariant = "bar" | "pill" | "floating";
 
+function resizeInput(input: HTMLTextAreaElement) {
+  input.style.height = "auto";
+  const border = input.offsetHeight - input.clientHeight;
+  input.style.height = `${input.scrollHeight + border}px`;
+}
+
 export interface ComposerProps {
   onSend: (message: string) => Promise<void> | void;
   disabled?: boolean;
@@ -31,9 +37,22 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
     const input = inputRef.current;
     if (!input) return;
 
-    input.style.height = "auto";
-    input.style.height = `${input.scrollHeight}px`;
+    resizeInput(input);
   }, [draft]);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input || typeof ResizeObserver === "undefined") return;
+    let previousWidth: number | undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      // Changing height also notifies observers; only width changes rewrap text.
+      if (!entry || entry.contentRect.width === previousWidth) return;
+      previousWidth = entry.contentRect.width;
+      resizeInput(input);
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, []);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
