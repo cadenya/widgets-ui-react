@@ -10,6 +10,44 @@ function typeMessage(message = "Hello") {
 }
 
 describe("Composer", () => {
+  it("grows and shrinks with a multiline draft", () => {
+    let scrollHeight = 36;
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(() => scrollHeight);
+    render(<Composer onSend={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement;
+
+    expect(input.style.height).toBe("36px");
+    scrollHeight = 116;
+    fireEvent.change(input, { target: { value: "One\nTwo\nThree\nFour\nFive" } });
+    expect(input.style.height).toBe("116px");
+
+    scrollHeight = 36;
+    fireEvent.change(input, { target: { value: "One" } });
+    expect(input.style.height).toBe("36px");
+  });
+
+  it.each(["bar", "pill", "floating"] as const)("autosizes the %s variant", (variant) => {
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockReturnValue(72);
+    render(<Composer onSend={vi.fn()} variant={variant} />);
+    const input = typeMessage("One\nTwo\nThree");
+    expect(input.style.height).toBe("72px");
+  });
+
+  it("shrinks after a successful send", async () => {
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(function (
+      this: HTMLTextAreaElement,
+    ) {
+      return this.value ? 72 : 36;
+    });
+    render(<Composer onSend={vi.fn()} />);
+    const input = typeMessage("One\nTwo\nThree");
+    expect(input.style.height).toBe("72px");
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(input.style.height).toBe("36px"));
+    expect(input.value).toBe("");
+  });
+
   it("retains a failed draft, shows the error, and allows retry", async () => {
     const onSend = vi.fn().mockRejectedValueOnce(new Error("Offline")).mockResolvedValue(undefined);
     render(<Composer onSend={onSend} />);

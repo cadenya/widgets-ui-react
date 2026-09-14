@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { IconButton } from "@radix-ui/themes";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 
@@ -23,8 +23,17 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
   const busy = disabled || pending;
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    input.style.height = "auto";
+    input.style.height = `${input.scrollHeight}px`;
+  }, [draft]);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -55,6 +64,7 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
     <>
       <form className={`cdny-composer cdny-composer-${variant}`} onSubmit={submit}>
         <textarea
+          ref={inputRef}
           className="cdny-composer-input"
           rows={1}
           value={draft}
