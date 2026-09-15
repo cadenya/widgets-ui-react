@@ -171,3 +171,16 @@ describe("MessageThread renderTool", () => {
     expect(container.querySelectorAll(".cdny-thread-tool")).toHaveLength(1);
   });
 });
+
+it("uses lifecycle state for long completions and keeps heartbeat updates from scrolling", () => {
+  const timeline = [msg("a1", "assistant", "Checking sources.")];
+  const { container, rerender, getByRole } = render(<MessageThread timeline={timeline} responding />);
+  expect(getByRole("status").getAttribute("aria-label")).toBe("Agent is responding");
+  const viewport = container.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]");
+  if (viewport) viewport.scrollTop = 12;
+  rerender(<MessageThread timeline={timeline} responding isWorkerActive />);
+  expect(getByRole("status").getAttribute("aria-label")).toContain("worker active");
+  if (viewport) expect(viewport.scrollTop).toBe(12);
+  rerender(<MessageThread timeline={timeline} responding={false} isWorkerActive />);
+  expect(container.querySelector(".cdny-typing")).toBeNull();
+});
