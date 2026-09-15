@@ -79,30 +79,43 @@ type ThreadState = {
   timeline: TimelineItem[];
   loading: boolean;
   error: string | null;
+  reconnecting: boolean;
 };
 
 type ThreadAction =
   | { type: "reset"; client: CadenyaWidgets; conversationId: string | null }
   | { type: "backfilled"; events: WidgetEvent[] }
   | { type: "event"; event: WidgetEvent }
+  | { type: "reconnecting"; reconnecting: boolean }
   | { type: "error"; message: string };
 
 function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
   switch (action.type) {
     case "reset":
+      if (state.client === action.client && state.conversationId === action.conversationId) {
+        return {
+          ...state,
+          loading: action.conversationId != null && state.timeline.length === 0,
+          error: null,
+          reconnecting: false,
+        };
+      }
       return {
         client: action.client,
         conversationId: action.conversationId,
         timeline: [],
         loading: action.conversationId != null,
         error: null,
+        reconnecting: false,
       };
     case "backfilled":
       return { ...state, timeline: applyEvents(state.timeline, action.events), loading: false };
     case "event":
       return { ...state, timeline: applyEvent(state.timeline, action.event) };
+    case "reconnecting":
+      return { ...state, reconnecting: action.reconnecting };
     case "error":
-      return { ...state, loading: false, error: action.message };
+      return { ...state, loading: false, reconnecting: false, error: action.message };
   }
 }
 
@@ -110,6 +123,8 @@ export interface UseConversationResult {
   timeline: TimelineItem[];
   loading: boolean;
   error: string | null;
+  /** Whether the live event stream is waiting to reconnect. */
+  reconnecting: boolean;
   sending: boolean;
   /** Send the next visitor message on this conversation. */
   send: (message: string) => Promise<void>;
@@ -117,6 +132,8 @@ export interface UseConversationResult {
   denyToolCall: (toolCallId: string) => Promise<void>;
   /** Supply a bare tool call's result; arrives back as a toolResult event. */
   setToolCallContent: (toolCallId: string, content: string) => Promise<void>;
+  /** Retry after a non-recoverable subscription error. */
+  retry: () => void;
 }
 
 /**
@@ -136,8 +153,10 @@ export function useConversation(conversationId: string | null): UseConversationR
     timeline: [],
     loading: id != null,
     error: null,
+    reconnecting: false,
   }));
   const [sending, setSending] = useState(false);
+  const [subscriptionAttempt, setSubscriptionAttempt] = useState(0);
 
   useEffect(() => {
     dispatch({ type: "reset", client, conversationId });
@@ -151,13 +170,16 @@ export function useConversation(conversationId: string | null): UseConversationR
       signal: controller.signal,
       onHistory: (events) => dispatch({ type: "backfilled", events }),
       onEvent: (event) => dispatch({ type: "event", event }),
+      onReconnecting: (reconnecting) => dispatch({ type: "reconnecting", reconnecting }),
     }).catch((err: unknown) => {
       if (controller.signal.aborted) return;
       dispatch({ type: "error", message: err instanceof Error ? err.message : String(err) });
     });
 
     return () => controller.abort();
-  }, [client, conversationId]);
+  }, [client, conversationId, subscriptionAttempt]);
+
+  const retry = useCallback(() => setSubscriptionAttempt((attempt) => attempt + 1), []);
 
   const send = useCallback(
     async (message: string) => {
@@ -203,10 +225,12 @@ export function useConversation(conversationId: string | null): UseConversationR
     timeline: current ? state.timeline : [],
     loading: current ? state.loading : conversationId != null,
     error: current ? state.error : null,
+    reconnecting: current ? state.reconnecting : false,
     sending,
     send,
     approveToolCall,
     denyToolCall,
     setToolCallContent,
+    retry,
   };
 }
