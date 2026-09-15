@@ -226,3 +226,41 @@ describe("ConversationsPanel paginated history", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 });
+
+describe("ConversationsPanel connection recovery", () => {
+  it("offers a retry for a non-recoverable stream error and preserves the thread", async () => {
+    const { client } = createMockClient({
+      latency: 0,
+      conversations: [conversation("c1")],
+      events: {
+        c1: [
+          {
+            id: "e1",
+            conversationId: "c1",
+            createdAt: "2026-08-14T00:00:00Z",
+            type: "userMessage",
+            userMessage: { content: "Keep this message" },
+          },
+        ] as WidgetEvent[],
+      },
+    });
+    vi.spyOn(client.conversations, "streamEvents").mockRejectedValueOnce(
+      Object.assign(new Error("Conversation access expired"), { status: 403 }),
+    );
+    render(
+      <WidgetClientProvider client={client}>
+        <ConversationsPanel />
+      </WidgetClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Conversation c1" }));
+
+    await screen.findByText("Keep this message");
+    fireEvent.click(await screen.findByRole("button", { name: "Retry connection" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Retry connection" })).toBeNull(),
+    );
+    expect(screen.getByText("Keep this message")).toBeTruthy();
+    expect(client.conversations.streamEvents).toHaveBeenCalledTimes(2);
+  });
+});

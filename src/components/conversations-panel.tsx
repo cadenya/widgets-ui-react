@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment, useState, type ReactNode } from "react";
-import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
-import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { Box, Button, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
+import { ExclamationTriangleIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { useConversation, useConversations, useWidgetConfig } from "../hooks.js";
 import { usePageToolExecution } from "../use-page-tool-execution.js";
 import { activeTools, type ToolItem } from "../timeline.js";
@@ -89,11 +89,13 @@ export function ConversationsPanel({
     timeline,
     loading: threadLoading,
     error: threadError,
+    reconnecting,
     sending,
     send,
     approveToolCall,
     denyToolCall,
     setToolCallContent,
+    retry,
   } = useConversation(selectedId);
 
   const onSend = async (message: string) => {
@@ -111,7 +113,7 @@ export function ConversationsPanel({
     selectedId !== null && !threadLoading && !threadError,
     setToolCallContent,
   );
-  const error = listError ?? threadError ?? pageToolError;
+  const error = listError ?? pageToolError;
   const tools = toolPlacement === "activity" ? activeTools(timeline) : [];
 
   // One tool call as its registered component (with the call's folded
@@ -189,6 +191,25 @@ export function ConversationsPanel({
               <ExclamationTriangleIcon />
             </Callout.Icon>
             <Callout.Text>{error}</Callout.Text>
+          </Callout.Root>
+        )}
+        {threadError && (
+          <Callout.Root role="alert" color="red" size="1" m="3" mb="0" className="cdny-error">
+            <Callout.Icon>
+              <ExclamationTriangleIcon />
+            </Callout.Icon>
+            <Callout.Text>{threadError}</Callout.Text>
+            <Button size="1" variant="soft" onClick={retry}>
+              Retry connection
+            </Button>
+          </Callout.Root>
+        )}
+        {reconnecting && (
+          <Callout.Root role="status" color="amber" size="1" m="3" mb="0" className="cdny-reconnecting">
+            <Callout.Icon>
+              <UpdateIcon />
+            </Callout.Icon>
+            <Callout.Text>Reconnecting to conversation…</Callout.Text>
           </Callout.Root>
         )}
         {selectedId ? (
