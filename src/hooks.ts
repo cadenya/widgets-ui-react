@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useState } from "react";
 import type { CadenyaWidgets, WidgetConfig, WidgetConversation, WidgetEvent } from "@cadenya/widgets";
 import { useWidgetClient } from "./context.js";
 import { applyEvent, applyEvents, type TimelineItem } from "./timeline.js";
+import { applyLifecycle, emptyLifecycle, HEARTBEAT_FRESHNESS_MS, type Lifecycle, type ObjectiveState } from "./lifecycle.js";
 import { subscribeToConversation } from "./conversation-stream.js";
 
 /** Widget display metadata (name for the header). */
@@ -74,6 +75,7 @@ export function useConversations(): UseConversationsResult {
 }
 
 type ThreadState = {
+  lifecycle: Lifecycle;
   client: CadenyaWidgets;
   conversationId: string | null;
   timeline: TimelineItem[];
@@ -85,6 +87,8 @@ type ThreadAction =
   | { type: "reset"; client: CadenyaWidgets; conversationId: string | null }
   | { type: "backfilled"; events: WidgetEvent[] }
   | { type: "event"; event: WidgetEvent }
+  | { type: "snapshot"; conversation: WidgetConversation }
+  | { type: "expired"; at: number }
   | { type: "error"; message: string };
 
 function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
@@ -94,19 +98,32 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
         client: action.client,
         conversationId: action.conversationId,
         timeline: [],
+        lifecycle: emptyLifecycle,
         loading: action.conversationId != null,
         error: null,
       };
     case "backfilled":
-      return { ...state, timeline: applyEvents(state.timeline, action.events), loading: false };
+      return { ...state, timeline: applyEvents(state.timeline, action.events), lifecycle: action.events.reduce((life, event) => applyLifecycle(life, event, false), state.lifecycle), loading: false };
     case "event":
-      return { ...state, timeline: applyEvent(state.timeline, action.event) };
+      return { ...state, timeline: applyEvent(state.timeline, action.event), lifecycle: applyLifecycle(state.lifecycle, action.event, true) };
+    case "snapshot":
+      return state.lifecycle.stateEventId ? state : { ...state, lifecycle: { ...state.lifecycle, conversationState: action.conversation.state } };
+    case "expired":
+      return state.lifecycle.lastHeartbeatAt !== action.at ? state : { ...state, lifecycle: { ...state.lifecycle, lastHeartbeatAt: null } };
     case "error":
       return { ...state, loading: false, error: action.message };
   }
 }
 
 export interface UseConversationResult {
+  /** Precise lifecycle once observed in history or the live stream. */
+  objectiveState: ObjectiveState | null;
+  conversationState: WidgetConversation["state"] | null;
+  /** Recent execution anywhere in this objective tree; independent of lifecycle. */
+  isWorkerActive: boolean;
+  lastHeartbeatAt: number | null;
+  /** Undefined until authoritative state is available. */
+  responding: boolean | undefined;
   timeline: TimelineItem[];
   loading: boolean;
   error: string | null;
@@ -134,6 +151,7 @@ export function useConversation(conversationId: string | null): UseConversationR
     client,
     conversationId: id,
     timeline: [],
+    lifecycle: emptyLifecycle,
     loading: id != null,
     error: null,
   }));
@@ -144,6 +162,15 @@ export function useConversation(conversationId: string | null): UseConversationR
     if (!conversationId) return;
 
     const controller = new AbortController();
+
+    // Old conversations may predate durable state-change events. Their
+    // snapshot is a fallback and cannot overwrite an observed transition.
+    void (async () => {
+      try {
+        const conversation = await client.conversations.retrieve(conversationId, { signal: controller.signal });
+        if (!controller.signal.aborted) dispatch({ type: "snapshot", conversation });
+      } catch { /* History and live transitions remain usable if refresh fails. */ }
+    })();
 
     void subscribeToConversation({
       client,
@@ -158,6 +185,13 @@ export function useConversation(conversationId: string | null): UseConversationR
 
     return () => controller.abort();
   }, [client, conversationId]);
+
+  useEffect(() => {
+    const at = state.lifecycle.lastHeartbeatAt;
+    if (at === null) return;
+    const timer = setTimeout(() => dispatch({ type: "expired", at }), Math.max(0, at + HEARTBEAT_FRESHNESS_MS - Date.now()));
+    return () => clearTimeout(timer);
+  }, [state.lifecycle.lastHeartbeatAt]);
 
   const send = useCallback(
     async (message: string) => {
@@ -200,6 +234,12 @@ export function useConversation(conversationId: string | null): UseConversationR
   // Do not expose the previous conversation during the render before effect cleanup.
   const current = state.client === client && state.conversationId === conversationId;
   return {
+    objectiveState: current ? state.lifecycle.objectiveState : null,
+    conversationState: current ? state.lifecycle.conversationState : null,
+    lastHeartbeatAt: current ? state.lifecycle.lastHeartbeatAt : null,
+    isWorkerActive: current && state.lifecycle.lastHeartbeatAt !== null,
+    responding: current && state.lifecycle.conversationState && state.lifecycle.conversationState !== "STATE_UNSPECIFIED"
+      ? state.lifecycle.conversationState === "STATE_RESPONDING" : undefined,
     timeline: current ? state.timeline : [],
     loading: current ? state.loading : conversationId != null,
     error: current ? state.error : null,

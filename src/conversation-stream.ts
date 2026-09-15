@@ -19,7 +19,7 @@ async function loadHistory({ client, conversationId, signal, onHistory }: Subscr
     cursor = page.nextCursor;
   } while (cursor);
   onHistory(events);
-  return events.at(-1)?.id;
+  return events.findLast((event) => event.id.startsWith("objevt_"))?.id;
 }
 
 /** Resolve immediately on cancellation and release both timer and listener. */
@@ -50,11 +50,11 @@ async function streamTail(
         if (signal.aborted) return;
         progressed = true;
         attempts = 0;
-        lastEventId = event.id;
+        if (event.id.startsWith("objevt_")) lastEventId = event.id;
         onEvent(event);
       }
-      // Open/ping frames skipped by the SDK can still advance its checkpoint.
-      lastEventId = stream.lastEventId ?? lastEventId;
+      // Only persisted objective IDs are eligible to resume history.
+      if (stream.lastEventId?.startsWith("objevt_")) lastEventId = stream.lastEventId;
     } catch {
       if (signal.aborted) return;
     }
