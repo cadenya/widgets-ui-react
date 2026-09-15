@@ -37,9 +37,10 @@ function waitForRetry(delay: number, signal: AbortSignal): Promise<void> {
 }
 
 async function streamTail(
-  { client, conversationId, signal, onEvent }: Subscription,
+  subscription: Subscription,
   lastEventId: string | undefined,
 ): Promise<void> {
+  const { client, conversationId, signal, onEvent } = subscription;
   let attempts = 0;
   while (!signal.aborted) {
     let progressed = false;
@@ -63,6 +64,9 @@ async function streamTail(
       throw new Error("Lost connection to the conversation stream.");
     }
     await waitForRetry(Math.min(1000 * 2 ** attempts, 15000), signal);
+    // With no durable checkpoint, replay history after a disconnect as well:
+    // transient pulses may have filled Redis before the first durable frame.
+    if (!signal.aborted && !lastEventId) lastEventId = await loadHistory(subscription);
   }
 }
 
