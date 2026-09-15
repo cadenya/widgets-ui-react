@@ -19,7 +19,7 @@ async function loadHistory({ client, conversationId, signal, onHistory }: Subscr
     cursor = page.nextCursor;
   } while (cursor);
   onHistory(events);
-  return events.at(-1)?.id;
+  return events.findLast((event) => event.id.startsWith("objevt_"))?.id;
 }
 
 /** Resolve immediately on cancellation and release both timer and listener. */
@@ -37,9 +37,10 @@ function waitForRetry(delay: number, signal: AbortSignal): Promise<void> {
 }
 
 async function streamTail(
-  { client, conversationId, signal, onEvent }: Subscription,
+  subscription: Subscription,
   lastEventId: string | undefined,
 ): Promise<void> {
+  const { client, conversationId, signal, onEvent } = subscription;
   let attempts = 0;
   while (!signal.aborted) {
     let progressed = false;
@@ -50,11 +51,11 @@ async function streamTail(
         if (signal.aborted) return;
         progressed = true;
         attempts = 0;
-        lastEventId = event.id;
+        if (event.id.startsWith("objevt_")) lastEventId = event.id;
         onEvent(event);
       }
-      // Open/ping frames skipped by the SDK can still advance its checkpoint.
-      lastEventId = stream.lastEventId ?? lastEventId;
+      // Only persisted objective IDs are eligible to resume history.
+      if (stream.lastEventId?.startsWith("objevt_")) lastEventId = stream.lastEventId;
     } catch {
       if (signal.aborted) return;
     }
@@ -63,6 +64,9 @@ async function streamTail(
       throw new Error("Lost connection to the conversation stream.");
     }
     await waitForRetry(Math.min(1000 * 2 ** attempts, 15000), signal);
+    // With no durable checkpoint, replay history after a disconnect as well:
+    // transient pulses may have filled Redis before the first durable frame.
+    if (!signal.aborted && !lastEventId) lastEventId = await loadHistory(subscription);
   }
 }
 

@@ -43,3 +43,5 @@ export { ConversationList, type ConversationListProps } from "./components/conve
 export { MessageThread, type MessageThreadProps } from "./components/message-thread.js";
 export { Composer, type ComposerProps, type ComposerVariant } from "./components/composer.js";
 export { ToolActivity, type ToolActivityProps } from "./components/tool-activity.js";
+
+export type { ObjectiveState } from "./lifecycle.js";

@@ -142,3 +142,23 @@ type-checks the stories; `just storybook-build` emits a static site into
 The mock is injected through `WidgetClientProvider`, the exported escape
 hatch for supplying a preconstructed (or fake) client instead of
 `host`/`token` — handy for your own tests too.
+
+## Conversation lifecycle and worker activity
+
+`useConversation(id)` fetches the single-conversation snapshot with
+`client.conversations.retrieve(id)` (`GET /v1/conversations/{id}`) alongside
+history. It exposes `conversationState` (`STATE_RESPONDING`, `STATE_OPEN`, or
+`STATE_CLOSED`) and, after a `stateChanged` event, the precise `objectiveState`.
+Durable state transitions control the panel's responding indicator; a heartbeat
+never changes lifecycle state or adds a timeline item.
+
+`isWorkerActive` and `lastHeartbeatAt` report recent work, including work in
+nested sub-agents propagated to this conversation. Liveness expires after 45
+seconds without a fresh pulse. Expiry means no recent pulse was observed; it
+does not mean the objective failed or finished. Waiting conversations can have
+active sub-agents or compaction without becoming responding conversations.
+
+Heartbeat payloads have `hb_` IDs and no SSE `id:` field. Reconnects use only
+persisted `objevt_` IDs. This branch pins the generated widgets SDK to an exact
+commit in `cadenya/widgets-sdk-staging`; Git installations build the React
+package through its `prepare` script.

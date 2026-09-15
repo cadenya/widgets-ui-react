@@ -166,3 +166,21 @@ export const Loading: Story = {
 export const Empty: Story = {
   args: { timeline: [] },
 };
+
+export const LongCompletion: Story = {
+  name: "Worker active after an assistant message",
+  args: {
+    timeline: [msg("user", "Research this in detail."), msg("assistant", "I'll check the supporting sources.")],
+    responding: true,
+    isWorkerActive: true,
+  },
+};
+
+export const WaitingWithBackgroundWork: Story = {
+  name: "Waiting for the visitor while a sub-agent works",
+  args: {
+    timeline: [msg("assistant", "Which region should I focus on?")],
+    responding: false,
+    isWorkerActive: true,
+  },
+};
