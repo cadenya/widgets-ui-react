@@ -12,7 +12,7 @@ const emptyStream = () => ({ async *[Symbol.asyncIterator]() {} });
 
 function setup() {
   const controller = new AbortController();
-  const listEvents = vi.fn().mockResolvedValue({ items: [event("e1")] });
+  const listEvents = vi.fn().mockResolvedValue({ items: [event("objevt_e1")] });
   const streamEvents = vi.fn().mockResolvedValue(emptyStream());
   const onHistory = vi.fn();
   const onEvent = vi.fn();
@@ -29,17 +29,17 @@ describe("conversation subscription", () => {
   it("publishes all history together and resumes after the final page", async () => {
     const s = setup();
     const page = deferred<{ items: WidgetEvent[] }>();
-    s.listEvents.mockResolvedValueOnce({ items: [event("e1")], nextCursor: "page2" })
+    s.listEvents.mockResolvedValueOnce({ items: [event("objevt_e1")], nextCursor: "page2" })
       .mockReturnValueOnce(page.promise);
     s.streamEvents.mockImplementation(async () => { s.controller.abort(); return emptyStream(); });
     const running = s.run();
     await vi.waitFor(() => expect(s.listEvents).toHaveBeenCalledTimes(2));
     expect(s.onHistory).not.toHaveBeenCalled();
     expect(s.streamEvents).not.toHaveBeenCalled();
-    page.resolve({ items: [event("e2")] });
+    page.resolve({ items: [event("objevt_e2")] });
     await running;
-    expect(s.onHistory).toHaveBeenCalledExactlyOnceWith([event("e1"), event("e2")]);
-    expect(s.streamEvents).toHaveBeenCalledWith("c1", { signal: s.controller.signal, lastEventId: "e2" });
+    expect(s.onHistory).toHaveBeenCalledExactlyOnceWith([event("objevt_e1"), event("objevt_e2")]);
+    expect(s.streamEvents).toHaveBeenCalledWith("c1", { signal: s.controller.signal, lastEventId: "objevt_e2" });
     expect(s.listEvents).toHaveBeenLastCalledWith("c1", { cursor: "page2" }, { signal: s.controller.signal });
   });
 
@@ -71,11 +71,11 @@ describe("conversation subscription", () => {
   it("reconnects using the SDK checkpoint and releases the backoff timer on abort", async () => {
     vi.useFakeTimers();
     const s = setup();
-    s.streamEvents.mockResolvedValue({ ...emptyStream(), lastEventId: "ping-checkpoint" });
+    s.streamEvents.mockResolvedValue({ ...emptyStream(), lastEventId: "objevt_ping-checkpoint" });
     const running = s.run();
     await vi.advanceTimersByTimeAsync(2000);
     expect(s.streamEvents).toHaveBeenCalledTimes(2);
-    expect(s.streamEvents.mock.calls[1][1].lastEventId).toBe("ping-checkpoint");
+    expect(s.streamEvents.mock.calls[1][1].lastEventId).toBe("objevt_ping-checkpoint");
     s.controller.abort();
     await running;
     expect(vi.getTimerCount()).toBe(0);
@@ -89,4 +89,20 @@ describe("conversation subscription", () => {
     await result;
     expect(s.streamEvents).toHaveBeenCalledTimes(6);
   });
+});
+
+it("delivers heartbeats while keeping the durable cursor across EOF", async () => {
+  vi.useFakeTimers();
+  const s = setup();
+  const heartbeat = { ...event("hb_pulse"), type: "heartbeat", heartbeat: {} } as WidgetEvent;
+  s.streamEvents.mockResolvedValueOnce({
+    lastEventId: "hb_invalid-checkpoint",
+    async *[Symbol.asyncIterator]() { yield heartbeat; },
+  });
+  const running = s.run();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(s.onEvent).toHaveBeenCalledWith(heartbeat);
+  expect(s.streamEvents.mock.calls[1][1].lastEventId).toBe("objevt_e1");
+  s.controller.abort();
+  await running;
 });

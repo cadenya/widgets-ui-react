@@ -90,6 +90,9 @@ export function ConversationsPanel({
     loading: threadLoading,
     error: threadError,
     sending,
+    responding,
+    isWorkerActive,
+    conversationState,
     send,
     approveToolCall,
     denyToolCall,
@@ -195,6 +198,8 @@ export function ConversationsPanel({
           <MessageThread
             timeline={timeline}
             loading={threadLoading}
+            responding={responding}
+            isWorkerActive={isWorkerActive}
             renderTool={toolPlacement === "inline" ? (item) => renderToolItem(item, "inline") : undefined}
           />
         ) : (
@@ -223,7 +228,7 @@ export function ConversationsPanel({
         <Composer
           variant={composer}
           onSend={onSend}
-          disabled={sending}
+          disabled={sending || threadLoading || conversationState === "STATE_CLOSED"}
           placeholder={selectedId ? "Send a message…" : "Ask anything to get started…"}
         />
       </Flex>

@@ -37,10 +37,11 @@
     "check:package": "npm run build && publint && attw --pack . --profile esm-only --exclude-entrypoints ./styles.css && node --input-type=module -e \"const m = await import('./dist/index.js'); if (!m.ConversationsPanel || !m.usePageTool) throw new Error('missing exports'); console.log('node import smoke: ok');\"",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "typecheck:storybook": "tsc -p tsconfig.storybook.json"
+    "typecheck:storybook": "tsc -p tsconfig.storybook.json",
+    "prepare": "npm run build"
   },
   "dependencies": {
-    "@cadenya/widgets": "^1.0.1",
+    "@cadenya/widgets": "1.2.0",
     "@radix-ui/react-icons": "^1.3.2",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"

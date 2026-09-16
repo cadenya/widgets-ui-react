@@ -130,3 +130,39 @@ describe("useConversation async isolation", () => {
     expect(client.conversations.streamEvents).toHaveBeenCalledTimes(1);
   });
 });
+
+it("loads the single conversation snapshot for conversations without lifecycle history", async () => {
+  const { client } = fakeClient({ c: [] });
+  client.conversations.retrieve = vi.fn().mockResolvedValue({ id: "c", state: "STATE_RESPONDING" });
+  const { result, unmount } = renderHook(() => useConversation("c"), { wrapper: wrapperFor(client) });
+  await waitFor(() => expect(result.current.responding).toBe(true));
+  expect(client.conversations.retrieve).toHaveBeenCalledWith("c", expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  expect(result.current.isWorkerActive).toBe(false);
+  unmount();
+});
+
+it("expires worker liveness without changing lifecycle or rebuilding the timeline", async () => {
+  vi.useFakeTimers();
+  try {
+    const { client } = fakeClient({ c: [] });
+    client.conversations.retrieve = vi.fn().mockResolvedValue({ id: "c", state: "STATE_OPEN" });
+    client.conversations.streamEvents = vi.fn().mockImplementation(async (_id, { signal }) => ({
+      async *[Symbol.asyncIterator]() {
+        yield { id: "hb_pulse", conversationId: "c", createdAt: new Date().toISOString(), type: "heartbeat", heartbeat: {} };
+        await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+      },
+    }));
+    const { result, unmount } = renderHook(() => useConversation("c"), { wrapper: wrapperFor(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(result.current.isWorkerActive).toBe(true);
+    expect(result.current.responding).toBe(false);
+    const timeline = result.current.timeline;
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_999); });
+    expect(result.current.isWorkerActive).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2); });
+    expect(result.current.isWorkerActive).toBe(false);
+    expect(result.current.responding).toBe(false);
+    expect(result.current.timeline).toBe(timeline);
+    unmount();
+  } finally { vi.useRealTimers(); }
+});

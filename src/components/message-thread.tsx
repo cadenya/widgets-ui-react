@@ -10,6 +10,10 @@ import { awaitingReply } from "../timeline.js";
 export interface MessageThreadProps {
   timeline: TimelineItem[];
   loading?: boolean;
+  /** Authoritative lifecycle overrides the legacy message heuristic. */
+  responding?: boolean;
+  /** Recent worker activity, including work in sub-agents. */
+  isWorkerActive?: boolean;
   /**
    * Render a tool call inline, at its position in the conversation. Called
    * for every tool item, on every render, with the item's folded state
@@ -35,7 +39,7 @@ export interface MessageThreadProps {
  * timeline, so once a later event for the same id carries text, the bubble
  * appears.
  */
-export function MessageThread({ timeline, loading, renderTool }: MessageThreadProps) {
+export function MessageThread({ timeline, loading, responding, isWorkerActive, renderTool }: MessageThreadProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,8 +86,8 @@ export function MessageThread({ timeline, loading, renderTool }: MessageThreadPr
               return <Notice key={item.id} item={item} />;
           }
         })}
-        {awaitingReply(timeline) && (
-          <div className="cdny-bubble cdny-bubble-assistant cdny-typing" aria-label="Agent is responding">
+        {(responding ?? awaitingReply(timeline)) && (
+          <div className="cdny-bubble cdny-bubble-assistant cdny-typing" role="status" aria-label={isWorkerActive ? "Agent is responding; worker active" : "Agent is responding"}>
             <span />
             <span />
             <span />
