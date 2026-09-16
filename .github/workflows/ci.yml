@@ -14,20 +14,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Configure read-only staging SDK access
-        env:
-          STAGING_SDK_KEY: ${{ secrets.WIDGETS_SDK_STAGING_DEPLOY_KEY }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/staging-sdk-ssh"
-          printf '%s\n' "$STAGING_SDK_KEY" > "$RUNNER_TEMP/staging-sdk-ssh/key"
-          chmod 600 "$RUNNER_TEMP/staging-sdk-ssh/key"
-          echo "GIT_SSH_COMMAND=ssh -i $RUNNER_TEMP/staging-sdk-ssh/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$GITHUB_WORKSPACE/.github/github_known_hosts" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm run typecheck:tests
       - run: npm test
       # Evaluate the built package as a real Node module (publint + attw +
       # a bare Node import) — bundlers hide unspecified-ESM packaging bugs.
       - run: npm run check:package
-      - name: Remove staging SDK key
-        if: always()
-        run: rm -f "$RUNNER_TEMP/staging-sdk-ssh/key"

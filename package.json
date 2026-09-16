@@ -41,7 +41,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@cadenya/widgets": "github:cadenya/widgets-sdk-staging#520ac2caa19accea6ad03a7a434960ff55c9eebf",
+    "@cadenya/widgets": "1.2.0",
     "@radix-ui/react-icons": "^1.3.2",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
