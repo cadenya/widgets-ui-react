@@ -157,7 +157,9 @@ it("expires worker liveness without changing lifecycle or rebuilding the timelin
     expect(result.current.isWorkerActive).toBe(true);
     expect(result.current.responding).toBe(false);
     const timeline = result.current.timeline;
-    await act(async () => { await vi.advanceTimersByTimeAsync(45_001); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_999); });
+    expect(result.current.isWorkerActive).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2); });
     expect(result.current.isWorkerActive).toBe(false);
     expect(result.current.responding).toBe(false);
     expect(result.current.timeline).toBe(timeline);

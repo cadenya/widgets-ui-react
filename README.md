@@ -153,7 +153,7 @@ Durable state transitions control the panel's responding indicator; a heartbeat
 never changes lifecycle state or adds a timeline item.
 
 `isWorkerActive` and `lastHeartbeatAt` report recent work, including work in
-nested sub-agents propagated to this conversation. Liveness expires after 45
+nested sub-agents propagated to this conversation. Liveness expires after 10
 seconds without a fresh pulse. Expiry means no recent pulse was observed; it
 does not mean the objective failed or finished. Waiting conversations can have
 active sub-agents or compaction without becoming responding conversations.

@@ -1,7 +1,7 @@
 import type { WidgetConversation, WidgetEvent, WidgetObjectiveStateChangedEvent } from "@cadenya/widgets";
 
 export type ObjectiveState = WidgetObjectiveStateChangedEvent["toState"];
-export const HEARTBEAT_FRESHNESS_MS = 45_000;
+export const HEARTBEAT_FRESHNESS_MS = 10_000;
 export interface Lifecycle {
   conversationState: WidgetConversation["state"] | null;
   objectiveState: ObjectiveState | null;
