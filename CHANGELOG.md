@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/cadenya/widgets-ui-react/compare/v0.2.0...v0.3.0) (2026-09-16)
+
+
+### Features
+
+* show conversation state and worker liveness ([bd0e5f3](https://github.com/cadenya/widgets-ui-react/commit/bd0e5f381822781052472e60f024ca2a24d1c09b))
+
+
+### Bug Fixes
+
+* normalize missing assistant message content ([#15](https://github.com/cadenya/widgets-ui-react/issues/15)) ([43fb29b](https://github.com/cadenya/widgets-ui-react/commit/43fb29b7e55adac66aad19651eaeb12ecb82ad80))
+
 ## [0.2.0](https://github.com/cadenya/widgets-ui-react/compare/v0.1.0...v0.2.0) (2026-09-09)
 
 
