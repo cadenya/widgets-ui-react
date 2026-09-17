@@ -14,6 +14,7 @@ function resizeInput(input: HTMLTextAreaElement) {
 
 export interface ComposerProps {
   onSend: (message: string) => Promise<void> | void;
+  /** Prevent editing and sending while keeping the input focusable. */
   disabled?: boolean;
   placeholder?: string;
   /**
@@ -59,6 +60,8 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
     const message = draft.trim();
     if (!message || disabled || submitting.current) return;
     submitting.current = true;
+    // Return focus from Send before it is disabled, including keyboard activation.
+    inputRef.current?.focus({ preventScroll: true });
     setPending(true);
     setError(null);
     try {
@@ -90,7 +93,9 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder ?? "Send a message…"}
-          disabled={busy}
+          // A disabled textarea loses focus when a send or parent load begins.
+          readOnly={busy}
+          aria-disabled={busy || undefined}
           aria-label="Message"
         />
         <IconButton
