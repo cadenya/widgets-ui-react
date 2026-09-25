@@ -16,11 +16,12 @@ function setup() {
   const streamEvents = vi.fn().mockResolvedValue(emptyStream());
   const onHistory = vi.fn();
   const onEvent = vi.fn();
+  const onReconnecting = vi.fn();
   const run = () => subscribeToConversation({
     client: { conversations: { listEvents, streamEvents } } as unknown as CadenyaWidgets,
-    conversationId: "c1", signal: controller.signal, onHistory, onEvent,
+    conversationId: "c1", signal: controller.signal, onHistory, onEvent, onReconnecting,
   });
-  return { controller, listEvents, streamEvents, onHistory, onEvent, run };
+  return { controller, listEvents, streamEvents, onHistory, onEvent, onReconnecting, run };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -39,7 +40,9 @@ describe("conversation subscription", () => {
     page.resolve({ items: [event("objevt_e2")] });
     await running;
     expect(s.onHistory).toHaveBeenCalledExactlyOnceWith([event("objevt_e1"), event("objevt_e2")]);
-    expect(s.streamEvents).toHaveBeenCalledWith("c1", { signal: s.controller.signal, lastEventId: "objevt_e2" });
+    expect(s.streamEvents).toHaveBeenCalledWith("c1", {
+      signal: s.controller.signal, lastEventId: "objevt_e2", reconnect: false,
+    });
     expect(s.listEvents).toHaveBeenLastCalledWith("c1", { cursor: "page2" }, { signal: s.controller.signal });
   });
 
@@ -73,21 +76,81 @@ describe("conversation subscription", () => {
     const s = setup();
     s.streamEvents.mockResolvedValue({ ...emptyStream(), lastEventId: "objevt_ping-checkpoint" });
     const running = s.run();
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(1000);
     expect(s.streamEvents).toHaveBeenCalledTimes(2);
     expect(s.streamEvents.mock.calls[1][1].lastEventId).toBe("objevt_ping-checkpoint");
+    expect(s.onReconnecting).toHaveBeenCalledWith(true);
     s.controller.abort();
     await running;
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("reports an error after bounded retries without progress", async () => {
+  it("keeps retrying through a prolonged outage with a bounded delay", async () => {
     vi.useFakeTimers();
     const s = setup();
-    const result = expect(s.run()).rejects.toThrow("Lost connection");
-    await vi.runAllTimersAsync();
-    await result;
-    expect(s.streamEvents).toHaveBeenCalledTimes(6);
+    const running = s.run();
+    await vi.advanceTimersByTimeAsync(80_000);
+    expect(s.streamEvents.mock.calls.length).toBeGreaterThan(6);
+    s.controller.abort();
+    await running;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("recovers after repeated failures and clears the reconnecting state", async () => {
+    vi.useFakeTimers();
+    const s = setup();
+    s.streamEvents
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockRejectedValueOnce(new Error("still offline"))
+      .mockResolvedValueOnce({
+        async *[Symbol.asyncIterator]() {
+          yield event("objevt_e2");
+          await new Promise<void>((resolve) =>
+            s.controller.signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+        },
+      });
+    const running = s.run();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(s.onEvent).toHaveBeenCalledExactlyOnceWith(event("objevt_e2"));
+    expect(s.streamEvents.mock.calls.map((call) => call[1].lastEventId)).toEqual([
+      "objevt_e1",
+      "objevt_e1",
+      "objevt_e1",
+    ]);
+    expect(s.onReconnecting.mock.calls.map(([value]) => value)).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
+    s.controller.abort();
+    await running;
+  });
+
+  it("retries interrupted history before publishing it atomically", async () => {
+    vi.useFakeTimers();
+    const s = setup();
+    s.listEvents
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ items: [event("objevt_e1")] });
+    s.streamEvents.mockImplementation(async () => {
+      s.controller.abort();
+      return emptyStream();
+    });
+    const running = s.run();
+    await vi.advanceTimersByTimeAsync(1000);
+    await running;
+    expect(s.listEvents).toHaveBeenCalledTimes(2);
+    expect(s.onHistory).toHaveBeenCalledExactlyOnceWith([event("objevt_e1")]);
+  });
+
+  it("stops automatically for a non-recoverable response", async () => {
+    const s = setup();
+    s.streamEvents.mockRejectedValue(Object.assign(new Error("Conversation not found"), { status: 404 }));
+    await expect(s.run()).rejects.toThrow("Conversation not found");
+    expect(s.streamEvents).toHaveBeenCalledTimes(1);
+    expect(s.onReconnecting).not.toHaveBeenCalledWith(true);
   });
 });
 

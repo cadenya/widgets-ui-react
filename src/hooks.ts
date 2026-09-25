@@ -81,6 +81,7 @@ type ThreadState = {
   timeline: TimelineItem[];
   loading: boolean;
   error: string | null;
+  reconnecting: boolean;
 };
 
 type ThreadAction =
@@ -89,11 +90,20 @@ type ThreadAction =
   | { type: "event"; event: WidgetEvent }
   | { type: "snapshot"; conversation: WidgetConversation }
   | { type: "expired"; at: number }
+  | { type: "reconnecting"; reconnecting: boolean }
   | { type: "error"; message: string };
 
 function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
   switch (action.type) {
     case "reset":
+      if (state.client === action.client && state.conversationId === action.conversationId) {
+        return {
+          ...state,
+          loading: action.conversationId != null && state.timeline.length === 0,
+          error: null,
+          reconnecting: false,
+        };
+      }
       return {
         client: action.client,
         conversationId: action.conversationId,
@@ -101,6 +111,7 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
         lifecycle: emptyLifecycle,
         loading: action.conversationId != null,
         error: null,
+        reconnecting: false,
       };
     case "backfilled":
       return { ...state, timeline: applyEvents(state.timeline, action.events), lifecycle: action.events.reduce((life, event) => applyLifecycle(life, event, false), state.lifecycle), loading: false };
@@ -110,8 +121,10 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
       return state.lifecycle.stateEventId ? state : { ...state, lifecycle: { ...state.lifecycle, conversationState: action.conversation.state } };
     case "expired":
       return state.lifecycle.lastHeartbeatAt !== action.at ? state : { ...state, lifecycle: { ...state.lifecycle, lastHeartbeatAt: null } };
+    case "reconnecting":
+      return { ...state, reconnecting: action.reconnecting };
     case "error":
-      return { ...state, loading: false, error: action.message };
+      return { ...state, loading: false, reconnecting: false, error: action.message };
   }
 }
 
@@ -127,6 +140,8 @@ export interface UseConversationResult {
   timeline: TimelineItem[];
   loading: boolean;
   error: string | null;
+  /** Whether the live event stream is waiting to reconnect. */
+  reconnecting: boolean;
   sending: boolean;
   /** Send the next visitor message on this conversation. */
   send: (message: string) => Promise<void>;
@@ -134,6 +149,8 @@ export interface UseConversationResult {
   denyToolCall: (toolCallId: string) => Promise<void>;
   /** Supply a bare tool call's result; arrives back as a toolResult event. */
   setToolCallContent: (toolCallId: string, content: string) => Promise<void>;
+  /** Retry after a non-recoverable subscription error. */
+  retry: () => void;
 }
 
 /**
@@ -154,8 +171,10 @@ export function useConversation(conversationId: string | null): UseConversationR
     lifecycle: emptyLifecycle,
     loading: id != null,
     error: null,
+    reconnecting: false,
   }));
   const [sending, setSending] = useState(false);
+  const [subscriptionAttempt, setSubscriptionAttempt] = useState(0);
 
   useEffect(() => {
     dispatch({ type: "reset", client, conversationId });
@@ -178,13 +197,16 @@ export function useConversation(conversationId: string | null): UseConversationR
       signal: controller.signal,
       onHistory: (events) => dispatch({ type: "backfilled", events }),
       onEvent: (event) => dispatch({ type: "event", event }),
+      onReconnecting: (reconnecting) => dispatch({ type: "reconnecting", reconnecting }),
     }).catch((err: unknown) => {
       if (controller.signal.aborted) return;
       dispatch({ type: "error", message: err instanceof Error ? err.message : String(err) });
     });
 
     return () => controller.abort();
-  }, [client, conversationId]);
+  }, [client, conversationId, subscriptionAttempt]);
+
+  const retry = useCallback(() => setSubscriptionAttempt((attempt) => attempt + 1), []);
 
   useEffect(() => {
     const at = state.lifecycle.lastHeartbeatAt;
@@ -243,10 +265,12 @@ export function useConversation(conversationId: string | null): UseConversationR
     timeline: current ? state.timeline : [],
     loading: current ? state.loading : conversationId != null,
     error: current ? state.error : null,
+    reconnecting: current ? state.reconnecting : false,
     sending,
     send,
     approveToolCall,
     denyToolCall,
     setToolCallContent,
+    retry,
   };
 }
