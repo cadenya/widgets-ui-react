@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/cadenya/widgets-ui-react/compare/v0.3.0...v0.3.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* preserve composer focus when submitting messages ([#20](https://github.com/cadenya/widgets-ui-react/issues/20)) ([844d33e](https://github.com/cadenya/widgets-ui-react/commit/844d33e1f8b2315fa8e76bc61f0c9e21680c8c10))
+
 ## [0.3.0](https://github.com/cadenya/widgets-ui-react/compare/v0.2.0...v0.3.0) (2026-09-16)
 
 
