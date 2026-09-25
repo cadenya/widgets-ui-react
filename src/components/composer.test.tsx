@@ -115,10 +115,90 @@ describe("Composer", () => {
       fireEvent.submit(input.closest("form")!);
     });
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(input.disabled).toBe(true);
+    expect(input.readOnly).toBe(true);
+    expect(input.disabled).toBe(false);
     await act(async () => resolve());
     expect(input.value).toBe("");
     expect(input.disabled).toBe(false);
+  });
+
+  it.each(["Enter", "Send"])("keeps focus during and after submission via %s", async (method) => {
+    let resolve!: () => void;
+    const onSend = vi.fn(() => new Promise<void>((done) => { resolve = done; }));
+    render(<Composer onSend={onSend} />);
+    const input = typeMessage();
+    input.focus();
+    if (method === "Enter") {
+      fireEvent.keyDown(input, { key: "Enter" });
+    } else {
+      const button = screen.getByRole("button", { name: "Send" });
+      // fireEvent.click does not simulate the browser moving focus to the button.
+      button.focus();
+      fireEvent.click(button);
+    }
+
+    expect(document.activeElement).toBe(input);
+    // jsdom does not blur controls when disabled; check browser focusability too.
+    expect(input.disabled).toBe(false);
+    expect(input.readOnly).toBe(true);
+    expect(input.getAttribute("aria-disabled")).toBe("true");
+    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSend).toHaveBeenCalledExactlyOnceWith("Hello");
+
+    await act(async () => resolve());
+    expect(input.value).toBe("");
+    expect(input.readOnly).toBe(false);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("keeps focus and the draft after a failed submission", async () => {
+    let reject!: (error: Error) => void;
+    const onSend = vi.fn(() => new Promise<void>((_, fail) => { reject = fail; }));
+    render(<Composer onSend={onSend} />);
+    const input = typeMessage("  Hello  ");
+    input.focus();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(input.disabled).toBe(false);
+    expect(document.activeElement).toBe(input);
+
+    await act(async () => reject(new Error("Offline")));
+    expect(screen.getByRole("alert").textContent).toContain("Offline");
+    expect(input.value).toBe("  Hello  ");
+    expect(input.readOnly).toBe(false);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("preserves focus across parent loading states after sending", async () => {
+    let resolve!: () => void;
+    const onSend = vi.fn(() => new Promise<void>((done) => { resolve = done; }));
+    const { rerender } = render(<Composer onSend={onSend} />);
+    const input = typeMessage();
+    input.focus();
+    fireEvent.keyDown(input, { key: "Enter" });
+    rerender(<Composer onSend={onSend} disabled />);
+    await act(async () => resolve());
+    expect(input.disabled).toBe(false);
+    expect(input.readOnly).toBe(true);
+    expect(document.activeElement).toBe(input);
+
+    rerender(<Composer onSend={onSend} />);
+    expect(input.readOnly).toBe(false);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it.each(["success", "failure"])("does not reclaim focus on %s if the user moved elsewhere", async (outcome) => {
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const onSend = vi.fn(() => new Promise<void>((done, fail) => { resolve = done; reject = fail; }));
+    render(<><Composer onSend={onSend} /><button>Elsewhere</button></>);
+    const input = typeMessage();
+    input.focus();
+    fireEvent.keyDown(input, { key: "Enter" });
+    const elsewhere = screen.getByRole("button", { name: "Elsewhere" });
+    elsewhere.focus();
+    await act(async () => outcome === "success" ? resolve() : reject(new Error("Offline")));
+    expect(document.activeElement).toBe(elsewhere);
   });
 
   it("does not send on IME confirmation, Shift+Enter, or while disabled", () => {

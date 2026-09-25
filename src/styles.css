@@ -195,7 +195,7 @@
   color: var(--gray-a10);
 }
 
-.cdny-composer-input:disabled {
+.cdny-composer-input[aria-disabled="true"] {
   opacity: 0.6;
 }
 
