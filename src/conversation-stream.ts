@@ -6,7 +6,21 @@ type Subscription = {
   signal: AbortSignal;
   onHistory: (events: WidgetEvent[]) => void;
   onEvent: (event: WidgetEvent) => void;
+  onReconnecting?: (reconnecting: boolean) => void;
 };
+
+const MAX_RETRY_DELAY = 15_000;
+
+function retryDelay(attempt: number) {
+  return Math.min(1000 * 2 ** Math.min(attempt, 4), MAX_RETRY_DELAY);
+}
+
+/** Most 4xx responses need a user or configuration change before retrying. */
+function isRetryable(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status !== "number") return true;
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
 
 /** Publish history atomically: a tool's result can be on a later page. */
 async function loadHistory({ client, conversationId, signal, onHistory }: Subscription) {
@@ -40,39 +54,55 @@ async function streamTail(
   subscription: Subscription,
   lastEventId: string | undefined,
 ): Promise<void> {
-  const { client, conversationId, signal, onEvent } = subscription;
+  const { client, conversationId, signal, onEvent, onReconnecting } = subscription;
   let attempts = 0;
   while (!signal.aborted) {
-    let progressed = false;
     try {
-      const stream = await client.conversations.streamEvents(conversationId, { signal, lastEventId });
+      // Own the outer recovery loop so its lifetime follows the component,
+      // rather than the SDK's per-outage retry budget.
+      const stream = await client.conversations.streamEvents(conversationId, {
+        signal,
+        lastEventId,
+        reconnect: false,
+      });
       if (signal.aborted) return;
+      onReconnecting?.(false);
       for await (const event of stream) {
         if (signal.aborted) return;
-        progressed = true;
         attempts = 0;
         if (event.id.startsWith("objevt_")) lastEventId = event.id;
         onEvent(event);
       }
       // Only persisted objective IDs are eligible to resume history.
       if (stream.lastEventId?.startsWith("objevt_")) lastEventId = stream.lastEventId;
-    } catch {
+    } catch (error) {
       if (signal.aborted) return;
+      if (!isRetryable(error)) throw error;
     }
     if (signal.aborted) return;
-    if (!progressed && ++attempts > 5) {
-      throw new Error("Lost connection to the conversation stream.");
-    }
-    await waitForRetry(Math.min(1000 * 2 ** attempts, 15000), signal);
+    onReconnecting?.(true);
+    await waitForRetry(retryDelay(attempts++), signal);
     // With no durable checkpoint, replay history after a disconnect as well:
     // transient pulses may have filled Redis before the first durable frame.
     if (!signal.aborted && !lastEventId) lastEventId = await loadHistory(subscription);
   }
 }
 
-/** SDK retries transport drops; we also retry EOF/exhaustion with bounded backoff. */
+/** Keep history and its resumed event stream alive until explicitly cancelled. */
 export async function subscribeToConversation(subscription: Subscription): Promise<void> {
-  const lastEventId = await loadHistory(subscription);
-  if (subscription.signal.aborted) return;
-  await streamTail(subscription, lastEventId);
+  let attempts = 0;
+  while (!subscription.signal.aborted) {
+    try {
+      const lastEventId = await loadHistory(subscription);
+      if (subscription.signal.aborted) return;
+      subscription.onReconnecting?.(false);
+      await streamTail(subscription, lastEventId);
+      return;
+    } catch (error) {
+      if (subscription.signal.aborted) return;
+      if (!isRetryable(error)) throw error;
+      subscription.onReconnecting?.(true);
+      await waitForRetry(retryDelay(attempts++), subscription.signal);
+    }
+  }
 }

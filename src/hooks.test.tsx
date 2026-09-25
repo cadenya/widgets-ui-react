@@ -85,7 +85,8 @@ describe("useConversation(null)", () => {
   });
 
   it("clears a prior conversation's error when switching to null", async () => {
-    const { client } = fakeClient({ broken: new Error("history unavailable") });
+    const unavailable = Object.assign(new Error("history unavailable"), { status: 404 });
+    const { client } = fakeClient({ broken: unavailable });
     const { result, rerender } = renderHook((id: string | null) => useConversation(id), {
       wrapper: wrapperFor(client),
       initialProps: "broken" as string | null,
@@ -97,6 +98,20 @@ describe("useConversation(null)", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(false);
     expect(result.current.timeline).toEqual([]);
+  });
+
+  it("lets the visitor retry a non-recoverable subscription without losing history", async () => {
+    const unavailable = Object.assign(new Error("stream unavailable"), { status: 404 });
+    const { client } = fakeClient({ c1: [event("e1", "preserved")] });
+    vi.mocked(client.conversations.streamEvents).mockRejectedValueOnce(unavailable);
+    const { result } = renderHook(() => useConversation("c1"), { wrapper: wrapperFor(client) });
+    await waitFor(() => expect(result.current.error).toBe("stream unavailable"));
+    expect(result.current.timeline.map((item) => item.id)).toEqual(["e1"]);
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(client.conversations.streamEvents).toHaveBeenCalledTimes(2));
+    expect(result.current.error).toBeNull();
+    expect(result.current.timeline.map((item) => item.id)).toEqual(["e1"]);
   });
 
   it("send/approve/deny/setToolCallContent are no-ops while idle", async () => {
