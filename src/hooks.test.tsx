@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import type { CadenyaWidgets, WidgetEvent } from "@cadenya/widgets";
+import type { CadenyaWidgets, WidgetEvent, WidgetQueuedMessage } from "@cadenya/widgets";
 import { WidgetClientProvider } from "./context.js";
 import { useConversation } from "./hooks.js";
 
@@ -85,7 +85,8 @@ describe("useConversation(null)", () => {
   });
 
   it("clears a prior conversation's error when switching to null", async () => {
-    const { client } = fakeClient({ broken: new Error("history unavailable") });
+    const unavailable = Object.assign(new Error("history unavailable"), { status: 404 });
+    const { client } = fakeClient({ broken: unavailable });
     const { result, rerender } = renderHook((id: string | null) => useConversation(id), {
       wrapper: wrapperFor(client),
       initialProps: "broken" as string | null,
@@ -97,6 +98,20 @@ describe("useConversation(null)", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(false);
     expect(result.current.timeline).toEqual([]);
+  });
+
+  it("lets the visitor retry a non-recoverable subscription without losing history", async () => {
+    const unavailable = Object.assign(new Error("stream unavailable"), { status: 404 });
+    const { client } = fakeClient({ c1: [event("e1", "preserved")] });
+    vi.mocked(client.conversations.streamEvents).mockRejectedValueOnce(unavailable);
+    const { result } = renderHook(() => useConversation("c1"), { wrapper: wrapperFor(client) });
+    await waitFor(() => expect(result.current.error).toBe("stream unavailable"));
+    expect(result.current.timeline.map((item) => item.id)).toEqual(["e1"]);
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(client.conversations.streamEvents).toHaveBeenCalledTimes(2));
+    expect(result.current.error).toBeNull();
+    expect(result.current.timeline.map((item) => item.id)).toEqual(["e1"]);
   });
 
   it("send/approve/deny/setToolCallContent are no-ops while idle", async () => {
@@ -165,4 +180,104 @@ it("expires worker liveness without changing lifecycle or rebuilding the timelin
     expect(result.current.timeline).toBe(timeline);
     unmount();
   } finally { vi.useRealTimers(); }
+});
+
+function queuedMessage(id: string, content: string): WidgetQueuedMessage {
+  return { id, conversationId: "c", content, state: "STATE_QUEUED", createdAt: "2026-08-14T00:00:00Z" };
+}
+
+/** A fake client with a server-side queue and a stream the test can push into. */
+function queueClient(initial: WidgetQueuedMessage[]) {
+  const { client } = fakeClient({ c: [] });
+  const server = { queue: [...initial] };
+  let push!: (event: WidgetEvent) => void;
+  client.conversations.streamEvents = vi.fn().mockImplementation(async (_id, { signal }: { signal: AbortSignal }) => ({
+    async *[Symbol.asyncIterator]() {
+      const pending: WidgetEvent[] = [];
+      let wake: (() => void) | null = null;
+      push = (event) => { pending.push(event); wake?.(); };
+      while (!signal.aborted) {
+        const next = pending.shift();
+        if (next) { yield next; continue; }
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+          signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+      }
+    },
+  }));
+  client.conversations.listQueuedMessages = vi.fn().mockImplementation(async () => ({ items: [...server.queue] }));
+  client.conversations.continue = vi.fn();
+  client.conversations.removeQueuedMessage = vi.fn();
+  return { client, server, push: (event: WidgetEvent) => push(event) };
+}
+
+describe("useConversation queued messages", () => {
+  it("loads the conversation's queued messages", async () => {
+    const { client } = queueClient([queuedMessage("q1", "first")]);
+    const { result } = renderHook(() => useConversation("c"), { wrapper: wrapperFor(client) });
+    await waitFor(() => expect(result.current.queuedMessages.map((m) => m.id)).toEqual(["q1"]));
+    expect(client.conversations.listQueuedMessages).toHaveBeenCalledWith("c", { state: "STATE_QUEUED", limit: 100 });
+  });
+
+  it("sends with enqueue and shows a queued reply until the agent picks it up", async () => {
+    const { client, server, push } = queueClient([]);
+    const queued = queuedMessage("q1", "one more thing");
+    vi.mocked(client.conversations.continue).mockImplementation((async () => {
+      server.queue.push(queued);
+      return { type: "queuedMessage", queuedMessage: queued };
+    }) as unknown as typeof client.conversations.continue);
+    const { result } = renderHook(() => useConversation("c"), { wrapper: wrapperFor(client) });
+    await waitFor(() => expect(client.conversations.streamEvents).toHaveBeenCalled());
+
+    await act(async () => result.current.send("one more thing", { enqueue: true }));
+    expect(client.conversations.continue).toHaveBeenCalledWith("c", { message: "one more thing", enqueue: true });
+    expect(result.current.queuedMessages.map((m) => m.id)).toEqual(["q1"]);
+
+    // The agent picks it up: the queue empties and the message arrives as an event.
+    server.queue = [];
+    act(() => push(event("objevt_1", "one more thing")));
+    await waitFor(() => expect(result.current.queuedMessages).toEqual([]));
+  });
+
+  it("does not list a message sent immediately", async () => {
+    const { client } = queueClient([]);
+    vi.mocked(client.conversations.continue).mockResolvedValue(
+      { type: "event", event: event("objevt_1", "hi") } as never,
+    );
+    const { result } = renderHook(() => useConversation("c"), { wrapper: wrapperFor(client) });
+    await act(async () => result.current.send("hi", { enqueue: true }));
+    expect(result.current.queuedMessages).toEqual([]);
+  });
+
+  it("removes optimistically and falls back to the server's queue when removal fails", async () => {
+    const { client } = queueClient([queuedMessage("q1", "keep"), queuedMessage("q2", "drop")]);
+    let reject!: (err: Error) => void;
+    vi.mocked(client.conversations.removeQueuedMessage).mockImplementation(
+      (() => new Promise((_resolve, fail) => { reject = fail; })) as unknown as typeof client.conversations.removeQueuedMessage,
+    );
+    const { result } = renderHook(() => useConversation("c"), { wrapper: wrapperFor(client) });
+    await waitFor(() => expect(result.current.queuedMessages).toHaveLength(2));
+
+    let removal!: Promise<void>;
+    act(() => { removal = result.current.removeQueuedMessage("q2"); });
+    expect(result.current.queuedMessages.map((m) => m.id)).toEqual(["q1"]);
+    expect(client.conversations.removeQueuedMessage).toHaveBeenCalledWith("c", { queuedMessageId: "q2" });
+
+    await act(async () => {
+      reject(new Error("offline"));
+      await expect(removal).rejects.toThrow("offline");
+    });
+    expect(result.current.queuedMessages.map((m) => m.id)).toEqual(["q1", "q2"]);
+  });
+
+  it("does not show another conversation's queue", async () => {
+    const { client } = queueClient([queuedMessage("q1", "first")]);
+    const { result, rerender } = renderHook((id: string | null) => useConversation(id), {
+      wrapper: wrapperFor(client), initialProps: "c" as string | null,
+    });
+    await waitFor(() => expect(result.current.queuedMessages).toHaveLength(1));
+    rerender(null);
+    expect(result.current.queuedMessages).toEqual([]);
+  });
 });

@@ -42,6 +42,23 @@ export interface ToolRenderProps {
 }
 
 /**
+ * Looks a tool up by key: its external id first (as `external_id:<value>`,
+ * then bare), falling back to the tool ULID. Shared by every tool registry so
+ * they all resolve the same way.
+ */
+export function lookupTool<T>(
+  get: (key: string) => T | undefined,
+  tool: WidgetToolReference | undefined,
+): T | undefined {
+  if (!tool) return undefined;
+  if (tool.externalId) {
+    const byExternalId = get(`external_id:${tool.externalId}`) ?? get(tool.externalId);
+    if (byExternalId) return byExternalId;
+  }
+  return get(tool.id);
+}
+
+/**
  * The tool's external id is tried first when present — as
  * `external_id:<value>` and bare — before falling back to the tool ULID.
  */
@@ -49,11 +66,5 @@ export function resolveToolComponent(
   registry: ToolComponentRegistry,
   tool: WidgetToolReference | undefined,
 ): ComponentType<ToolRenderProps> | undefined {
-  if (!tool) return undefined;
-  if (tool.externalId) {
-    const byExternalId =
-      registry[`external_id:${tool.externalId}`] ?? registry[tool.externalId];
-    if (byExternalId) return byExternalId;
-  }
-  return registry[tool.id];
+  return lookupTool((key) => registry[key], tool);
 }

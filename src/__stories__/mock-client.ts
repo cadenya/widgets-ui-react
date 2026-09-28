@@ -2,7 +2,8 @@
  * In-memory stand-in for the `@cadenya/widgets` client, for Storybook.
  *
  * Implements exactly the surface the hooks use (config.retrieveWidget,
- * conversations.list/create/listEvents/streamEvents/continue/approveToolCall/
+ * conversations.list/create/listEvents/streamEvents/continue/listQueuedMessages/
+ * removeQueuedMessage/approveToolCall/
  * denyToolCall/setToolCallContent) on top of a per-conversation event log,
  * and runs a scripted "agent" that answers visitor messages by emitting
  * events into that log — so the real hooks, timeline reducer, and
@@ -13,6 +14,7 @@ import type {
   WidgetConfig,
   WidgetConversation,
   WidgetEvent,
+  WidgetQueuedMessage,
   WidgetToolReference,
 } from "@cadenya/widgets";
 
@@ -93,6 +95,8 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 interface ConversationRecord {
   conversation: WidgetConversation;
   events: WidgetEvent[];
+  /** Messages sent while the agent was responding, waiting for its next turn. */
+  queued: WidgetQueuedMessage[];
   subscribers: Set<(event: WidgetEvent) => void>;
 }
 
@@ -161,6 +165,7 @@ export function createMockClient(options: MockClientOptions = {}) {
     records.set(conversation.id, {
       conversation: { ...conversation },
       events: [...(options.events?.[conversation.id] ?? [])],
+      queued: [],
       subscribers: new Set(),
     });
   }
@@ -192,9 +197,19 @@ export function createMockClient(options: MockClientOptions = {}) {
     return event;
   };
 
-  const runAgent = async (conversationId: string, message: string) => {
+  const setResponding = (conversationId: string, responding: boolean) => {
+    get(conversationId).conversation.state = responding ? "STATE_RESPONDING" : "STATE_OPEN";
+    emit(conversationId, {
+      type: "stateChanged",
+      stateChanged: responding
+        ? { fromState: "WIDGET_OBJECTIVE_STATE_WAITING", toState: "WIDGET_OBJECTIVE_STATE_RUNNING" }
+        : { fromState: "WIDGET_OBJECTIVE_STATE_RUNNING", toState: "WIDGET_OBJECTIVE_STATE_WAITING" },
+    });
+  };
+
+  const runAgent = async (conversationId: string, message: string): Promise<void> => {
     const record = get(conversationId);
-    record.conversation.state = "STATE_RESPONDING";
+    if (record.conversation.state !== "STATE_RESPONDING") setResponding(conversationId, true);
     const ctx: AgentContext = {
       conversationId,
       message,
@@ -230,9 +245,15 @@ export function createMockClient(options: MockClientOptions = {}) {
         type: "error",
         error: { message: err instanceof Error ? err.message : String(err) },
       });
-    } finally {
-      record.conversation.state = "STATE_OPEN";
     }
+    // Like the real agent loop, messages queued during the turn are
+    // delivered together before the next reply.
+    const queued = record.queued.splice(0);
+    if (queued.length > 0) {
+      for (const item of queued) emit(conversationId, { type: "userMessage", userMessage: { content: item.content } });
+      return runAgent(conversationId, queued[queued.length - 1].content);
+    }
+    setResponding(conversationId, false);
   };
 
   const client = {
@@ -264,6 +285,7 @@ export function createMockClient(options: MockClientOptions = {}) {
             lastActiveAt: now,
           },
           events: [],
+          queued: [],
           subscribers: new Set(),
         });
         emit(id, { type: "userMessage", userMessage: { content: message } });
@@ -287,11 +309,36 @@ export function createMockClient(options: MockClientOptions = {}) {
         await net();
         return createStream(get(id), signal, lastEventId);
       },
-      continue: async (id: string, { message }: { message: string }) => {
+      continue: async (id: string, { message, enqueue }: { message: string; enqueue?: boolean }) => {
         await net();
-        emit(id, { type: "userMessage", userMessage: { content: message } });
+        const record = get(id);
+        if (record.conversation.state === "STATE_RESPONDING") {
+          if (!enqueue) throw new Error("The agent is still responding");
+          const queuedMessage: WidgetQueuedMessage = {
+            id: ulidish("objqa"),
+            conversationId: id,
+            content: message,
+            state: "STATE_QUEUED",
+            createdAt: new Date().toISOString(),
+          };
+          record.queued.push(queuedMessage);
+          return { type: "queuedMessage", queuedMessage };
+        }
+        const event = emit(id, { type: "userMessage", userMessage: { content: message } });
         void runAgent(id, message);
-        return { ...get(id).conversation };
+        return { type: "event", event };
+      },
+      listQueuedMessages: async (id: string) => {
+        await net();
+        return { items: [...get(id).queued], nextCursor: undefined };
+      },
+      removeQueuedMessage: async (id: string, { queuedMessageId }: { queuedMessageId: string }) => {
+        await net();
+        const record = get(id);
+        const index = record.queued.findIndex((item) => item.id === queuedMessageId);
+        if (index < 0) throw new Error("the agent already picked it up");
+        const [removed] = record.queued.splice(index, 1);
+        return { ...removed, state: "STATE_REMOVED" };
       },
       approveToolCall: async (_id: string, { toolCallId }: { toolCallId: string }) => {
         await net();

@@ -14,7 +14,13 @@ async function execute(handler: PageToolHandler, invocation: PageToolInvocation)
   }
 }
 
-/** Execute each pending call once per mount, only after complete history is available. */
+/**
+ * Executes each pending page tool call once per mount, only after complete
+ * history is available, and submits its result. ConversationsPanel runs this
+ * itself; custom thread UIs built from useConversation call it with the
+ * thread timeline, whether history is ready, and setToolCallContent. Returns
+ * a delivery error message, or null.
+ */
 export function usePageToolExecution(
   timeline: TimelineItem[],
   enabled: boolean,

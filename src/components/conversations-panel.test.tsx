@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
+import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { WidgetConversation, WidgetEvent } from "@cadenya/widgets";
 import { WidgetClientProvider } from "../context.js";
 import { approvalAgent, createMockClient, TOOLS } from "../__stories__/mock-client.js";
 import type { ToolRenderProps } from "../tool-registry.js";
 import { ConversationsPanel } from "./conversations-panel.js";
-import { PageToolsProvider, usePageTool } from "../page-tools.js";
+import { PageToolsProvider, usePageTool, useToolComponent } from "../page-tools.js";
 
 const TOOL = { id: "tool_01DISPLAY", externalId: "display_resource", name: "DisplayResource" };
 const ARGS = { name: "Faker", resource_type: "agent", labels: { env: "demo" } };
@@ -224,5 +225,148 @@ describe("ConversationsPanel paginated history", () => {
     await act(async () => resolve({ items: history.slice(3) }));
     await screen.findByText("That's all of them.");
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe("ConversationsPanel connection recovery", () => {
+  it("offers a retry for a non-recoverable stream error and preserves the thread", async () => {
+    const { client } = createMockClient({
+      latency: 0,
+      conversations: [conversation("c1")],
+      events: {
+        c1: [
+          {
+            id: "e1",
+            conversationId: "c1",
+            createdAt: "2026-08-14T00:00:00Z",
+            type: "userMessage",
+            userMessage: { content: "Keep this message" },
+          },
+        ] as WidgetEvent[],
+      },
+    });
+    vi.spyOn(client.conversations, "streamEvents").mockRejectedValueOnce(
+      Object.assign(new Error("Conversation access expired"), { status: 403 }),
+    );
+    render(
+      <WidgetClientProvider client={client}>
+        <ConversationsPanel />
+      </WidgetClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Conversation c1" }));
+
+    await screen.findByText("Keep this message");
+    fireEvent.click(await screen.findByRole("button", { name: "Retry connection" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Retry connection" })).toBeNull(),
+    );
+    expect(screen.getByText("Keep this message")).toBeTruthy();
+    expect(client.conversations.streamEvents).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ConversationsPanel while the agent is responding", () => {
+  /** An agent that keeps responding until the test lets it finish. */
+  function heldAgent() {
+    let finish!: () => void;
+    const done = new Promise<void>((resolve) => { finish = resolve; });
+    return { agent: () => done, finish: () => act(async () => finish()) };
+  }
+
+  async function startConversation() {
+    const input = await screen.findByRole("textbox", { name: "Message" });
+    fireEvent.change(input, { target: { value: "hello" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(input.getAttribute("placeholder")).toMatch(/^(Queue a follow-up|Waiting for the reply)/));
+    return input;
+  }
+
+  it("queues messages sent meanwhile above the composer, removable until delivered", async () => {
+    const held = heldAgent();
+    const { client } = createMockClient({ latency: 0, thinkTime: 0, agent: held.agent });
+    render(
+      <WidgetClientProvider client={client}>
+        <ConversationsPanel composer="floating" />
+      </WidgetClientProvider>,
+    );
+    const input = await startConversation();
+    expect(input.getAttribute("placeholder")).toBe("Queue a follow-up…");
+    expect(input.hasAttribute("aria-disabled")).toBe(false);
+
+    for (const message of ["first follow-up", "second follow-up"]) {
+      fireEvent.change(input, { target: { value: message } });
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      await screen.findByText(message);
+    }
+    const list = screen.getByRole("list", { name: "Queued messages" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    expect(input.closest("form")?.classList.contains("cdny-composer-attached")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove queued: first follow-up" }));
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(1));
+
+    await held.finish();
+    await waitFor(() => expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull());
+    expect(input.closest("form")?.classList.contains("cdny-composer-attached")).toBe(false);
+  });
+
+  it("waits for the reply when queueing is off", async () => {
+    const held = heldAgent();
+    const { client } = createMockClient({ latency: 0, thinkTime: 0, agent: held.agent });
+    render(
+      <WidgetClientProvider client={client}>
+        <ConversationsPanel queueWhileResponding={false} />
+      </WidgetClientProvider>,
+    );
+    const input = await startConversation();
+    expect(input.getAttribute("placeholder")).toBe("Waiting for the reply…");
+    expect(input.getAttribute("aria-disabled")).toBe("true");
+
+    await held.finish();
+    await waitFor(() => expect(input.hasAttribute("aria-disabled")).toBe(false));
+    expect(input.getAttribute("placeholder")).toBe("Send a message…");
+  });
+});
+
+function RegisteredCard({ component }: { component: (props: ToolRenderProps) => ReactElement }) {
+  useToolComponent("display_resource", component);
+  return null;
+}
+
+describe("ConversationsPanel with components registered in the provider", () => {
+  async function renderWithProvider(toolComponents?: Record<string, (props: ToolRenderProps) => ReactElement>) {
+    const registered = vi.fn((_props: ToolRenderProps) => <div data-testid="registered">registered</div>);
+    const { client } = createMockClient({
+      latency: 0,
+      conversations: [conversation("c1")],
+      events: { c1: events("c1", { arguments: ARGS }) },
+    });
+    render(
+      <WidgetClientProvider client={client}>
+        <PageToolsProvider>
+          <RegisteredCard component={registered} />
+          <ConversationsPanel toolComponents={toolComponents} />
+        </PageToolsProvider>
+      </WidgetClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Conversation c1" }));
+    return registered;
+  }
+
+  it("renders a tool call with the registered component", async () => {
+    const registered = await renderWithProvider();
+    await screen.findByTestId("registered");
+    const props = registered.mock.calls.at(-1)![0];
+    expect(props.args).toEqual(ARGS);
+    expect(props.status).toBe("running");
+  });
+
+  it("prefers the toolComponents prop for the same tool", async () => {
+    const fromProp = () => <div data-testid="prop">prop</div>;
+    const registered = await renderWithProvider({ display_resource: fromProp });
+    await screen.findByTestId("prop");
+    expect(screen.queryByTestId("registered")).toBeNull();
+    expect(registered).not.toHaveBeenCalled();
   });
 });

@@ -6,9 +6,11 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type ComponentType,
   type ReactNode,
 } from "react";
 import type { WidgetToolReference } from "@cadenya/widgets";
+import { lookupTool, type ToolRenderProps } from "./tool-registry.js";
 
 /**
  * Page tools: bare tool calls the embedding page executes itself, letting the
@@ -22,6 +24,12 @@ import type { WidgetToolReference } from "@cadenya/widgets";
  * destructive tools with approval-required so the visitor confirms in the
  * widget before the page mutates, and pin session parameters so calls can
  * only target what the page is showing.
+ *
+ * The provider also holds tool components registered with useToolComponent:
+ * renderers a ConversationsPanel under it uses for matching tool calls, in
+ * addition to its own toolComponents prop. That lets a single element (such
+ * as <WidgetTools>) bring both the renderers and the handlers a set of tools
+ * needs.
  */
 
 export interface PageToolInvocation {
@@ -44,12 +52,27 @@ export type PageToolHandler = (invocation: PageToolInvocation) => Promise<unknow
 export interface PageToolsStore {
   register(key: string, handler: PageToolHandler): () => void;
   resolve(tool: WidgetToolReference | undefined): PageToolHandler | undefined;
+  /** Registers a component that renders calls to the tool with this key. */
+  registerComponent(key: string, component: ComponentType<ToolRenderProps>): () => void;
+  resolveComponent(tool: WidgetToolReference | undefined): ComponentType<ToolRenderProps> | undefined;
+  /** Calls listener whenever registered components change. */
+  subscribe(listener: () => void): () => void;
+  /** A number that changes whenever registered components change. */
+  componentsVersion(): number;
 }
 
 const PageToolsContext = createContext<PageToolsStore | null>(null);
 
 export function createPageToolsStore(): PageToolsStore {
   const handlers = new Map<string, PageToolHandler>();
+  const components = new Map<string, ComponentType<ToolRenderProps>>();
+  const listeners = new Set<() => void>();
+  let version = 0;
+  const changed = () => {
+    version += 1;
+    for (const listener of listeners) listener();
+  };
+
   return {
     register(key, handler) {
       handlers.set(key, handler);
@@ -58,13 +81,29 @@ export function createPageToolsStore(): PageToolsStore {
       };
     },
     resolve(tool) {
-      if (!tool) return undefined;
-      if (tool.externalId) {
-        const byExternalId =
-          handlers.get(`external_id:${tool.externalId}`) ?? handlers.get(tool.externalId);
-        if (byExternalId) return byExternalId;
-      }
-      return handlers.get(tool.id);
+      return lookupTool((key) => handlers.get(key), tool);
+    },
+    registerComponent(key, component) {
+      components.set(key, component);
+      changed();
+      return () => {
+        if (components.get(key) === component) {
+          components.delete(key);
+          changed();
+        }
+      };
+    },
+    resolveComponent(tool) {
+      return lookupTool((key) => components.get(key), tool);
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    componentsVersion() {
+      return version;
     },
   };
 }
@@ -100,6 +139,21 @@ export function usePageTool(key: string, handler: PageToolHandler): void {
     () => store.register(key, (invocation) => handlerRef.current(invocation)),
     [store, key],
   );
+}
+
+/**
+ * Register a component that renders calls to a tool — keyed like usePageTool
+ * (the canonical `tool_…` id or your external id, bare or as
+ * `external_id:<value>`). A ConversationsPanel under the same provider uses
+ * it for matching calls; a component passed in the panel's toolComponents
+ * prop for the same tool wins. Unmounting unregisters.
+ */
+export function useToolComponent(key: string, component: ComponentType<ToolRenderProps>): void {
+  const store = useContext(PageToolsContext);
+  if (!store) {
+    throw new Error("Cadenya widgets: useToolComponent requires a <PageToolsProvider> ancestor.");
+  }
+  useEffect(() => store.registerComponent(key, component), [store, key, component]);
 }
 
 /** Encode a handler's return value for setToolCallContent. */

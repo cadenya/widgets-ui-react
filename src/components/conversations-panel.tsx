@@ -1,16 +1,21 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
-import { Box, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
-import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { Fragment, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Box, Button, Callout, Flex, Heading, ScrollArea } from "@radix-ui/themes";
+import { ExclamationTriangleIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { useConversation, useConversations, useWidgetConfig } from "../hooks.js";
+import { usePageToolsStore } from "../page-tools.js";
 import { usePageToolExecution } from "../use-page-tool-execution.js";
 import { activeTools, type ToolItem } from "../timeline.js";
 import { resolveToolComponent, type ToolComponentRegistry } from "../tool-registry.js";
 import { Composer, type ComposerVariant } from "./composer.js";
 import { ConversationList } from "./conversation-list.js";
 import { MessageThread } from "./message-thread.js";
+import { QueuedMessages } from "./queued-messages.js";
 import { ToolActivity } from "./tool-activity.js";
+
+const noSubscription = () => () => {};
+const noVersion = () => 0;
 
 export interface ConversationsPanelProps {
   /**
@@ -18,7 +23,9 @@ export interface ConversationsPanelProps {
    * A registered component replaces the default activity chip for the call's
    * active lifecycle, receiving the toolCalled payload, its folded status,
    * exposed arguments and result, and a submit callback wired to
-   * setToolCallContent (bare tools).
+   * setToolCallContent (bare tools). Components registered with
+   * useToolComponent in a surrounding <PageToolsProvider> also apply; this
+   * prop wins for the same tool.
    */
   toolComponents?: ToolComponentRegistry;
   /**
@@ -37,6 +44,14 @@ export interface ConversationsPanelProps {
    * capsule onto a shadowed card over a matte main area.
    */
   composer?: ComposerVariant;
+  /**
+   * What the composer does while the agent is responding. true (default):
+   * the visitor keeps typing, and messages sent meanwhile are queued for the
+   * agent's next reply, listed above the composer where they can be removed
+   * until the agent picks them up. false: the composer waits, and the
+   * visitor can only send once the agent has finished.
+   */
+  queueWhileResponding?: boolean;
   /**
    * Custom bubble colors. Each value is a full CSS background (gradients
    * work) or text color; unset values follow the surrounding Radix Theme.
@@ -78,6 +93,7 @@ export function ConversationsPanel({
   toolComponents = {},
   toolPlacement = "activity",
   composer = "bar",
+  queueWhileResponding = true,
   bubbleColors,
   className,
 }: ConversationsPanelProps = {}) {
@@ -89,19 +105,23 @@ export function ConversationsPanel({
     timeline,
     loading: threadLoading,
     error: threadError,
+    reconnecting,
     sending,
     responding,
     isWorkerActive,
     conversationState,
     send,
+    queuedMessages,
+    removeQueuedMessage,
     approveToolCall,
     denyToolCall,
     setToolCallContent,
+    retry,
   } = useConversation(selectedId);
 
   const onSend = async (message: string) => {
     if (selectedId) {
-      await send(message);
+      await send(message, { enqueue: queueWhileResponding });
       return;
     }
     // First message starts the conversation.
@@ -109,19 +129,32 @@ export function ConversationsPanel({
     setSelectedId(conversation.id);
   };
 
+  // Components registered in a surrounding <PageToolsProvider> (for example
+  // by <WidgetTools>) render calls the toolComponents prop doesn't cover.
+  // Subscribing re-renders the panel when one registers after it mounts.
+  const pageTools = usePageToolsStore();
+  useSyncExternalStore(
+    pageTools?.subscribe ?? noSubscription,
+    pageTools?.componentsVersion ?? noVersion,
+    pageTools?.componentsVersion ?? noVersion,
+  );
+
   const pageToolError = usePageToolExecution(
     timeline,
     selectedId !== null && !threadLoading && !threadError,
     setToolCallContent,
   );
-  const error = listError ?? threadError ?? pageToolError;
+  const error = listError ?? pageToolError;
+  const waitsForReply = selectedId !== null && responding === true;
+  const respondingPlaceholder = queueWhileResponding ? "Queue a follow-up…" : "Waiting for the reply…";
   const tools = toolPlacement === "activity" ? activeTools(timeline) : [];
 
   // One tool call as its registered component (with the call's folded
   // state and a submit wired to setToolCallContent) or the default chip.
   // The custom wrapper's class names the placement, for embedder CSS.
   const renderToolItem = (item: ToolItem, placement: ToolPlacement): ReactNode => {
-    const Custom = resolveToolComponent(toolComponents, item.tool);
+    const Custom =
+      resolveToolComponent(toolComponents, item.tool) ?? pageTools?.resolveComponent(item.tool);
     if (Custom && item.tool) {
       return (
         <Box
@@ -172,7 +205,7 @@ export function ConversationsPanel({
             {config?.displayName ?? "Conversations"}
           </Heading>
         </Box>
-        <ScrollArea scrollbars="vertical">
+        <ScrollArea scrollbars="vertical" className="cdny-list-scroll">
           <ConversationList
             conversations={conversations}
             selectedId={selectedId}
@@ -192,6 +225,25 @@ export function ConversationsPanel({
               <ExclamationTriangleIcon />
             </Callout.Icon>
             <Callout.Text>{error}</Callout.Text>
+          </Callout.Root>
+        )}
+        {threadError && (
+          <Callout.Root role="alert" color="red" size="1" m="3" mb="0" className="cdny-error">
+            <Callout.Icon>
+              <ExclamationTriangleIcon />
+            </Callout.Icon>
+            <Callout.Text>{threadError}</Callout.Text>
+            <Button size="1" variant="soft" onClick={retry}>
+              Retry connection
+            </Button>
+          </Callout.Root>
+        )}
+        {reconnecting && (
+          <Callout.Root role="status" color="amber" size="1" m="3" mb="0" className="cdny-reconnecting">
+            <Callout.Icon>
+              <UpdateIcon />
+            </Callout.Icon>
+            <Callout.Text>Reconnecting to conversation…</Callout.Text>
           </Callout.Root>
         )}
         {selectedId ? (
@@ -225,11 +277,17 @@ export function ConversationsPanel({
             ))}
           </Flex>
         )}
+        <QueuedMessages variant={composer} messages={queuedMessages} onRemove={removeQueuedMessage} />
         <Composer
           variant={composer}
+          attachedTop={queuedMessages.length > 0}
           onSend={onSend}
-          disabled={sending || threadLoading || conversationState === "STATE_CLOSED"}
-          placeholder={selectedId ? "Send a message…" : "Ask anything to get started…"}
+          disabled={
+            sending || threadLoading || conversationState === "STATE_CLOSED" || (waitsForReply && !queueWhileResponding)
+          }
+          placeholder={
+            !selectedId ? "Ask anything to get started…" : waitsForReply ? respondingPlaceholder : "Send a message…"
+          }
         />
       </Flex>
     </Flex>

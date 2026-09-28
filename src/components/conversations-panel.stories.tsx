@@ -37,6 +37,7 @@ const meta = {
   argTypes: {
     composer: { control: "inline-radio", options: ["bar", "pill", "floating"] },
     toolPlacement: { control: "inline-radio", options: ["activity", "inline"] },
+    queueWhileResponding: { control: "boolean" },
     bubbleColors: { control: "object" },
     toolComponents: { table: { disable: true } },
     className: { table: { disable: true } },
@@ -76,6 +77,26 @@ export const Default: Story = {
 export const WithThreadOpen: Story = {
   ...Default,
   play: openFakerConversation,
+};
+
+/** Messages sent while the agent is still replying queue above the composer. */
+export const QueueWhileResponding: Story = {
+  args: { composer: "floating", queueWhileResponding: true },
+  render: (args) => (
+    <MockProvider agent={echoAgent} thinkTime={2500}>
+      <ConversationsPanel {...args} />
+      <Hint>
+        Start a conversation, then send more while the agent is thinking: they queue above the
+        composer, can be removed, and are delivered together before its next reply.
+      </Hint>
+    </MockProvider>
+  ),
+};
+
+/** With queueing off, the composer waits until the agent has replied. */
+export const WaitForReply: Story = {
+  ...QueueWhileResponding,
+  args: { composer: "floating", queueWhileResponding: false },
 };
 
 export const Pill: Story = { ...Default, args: { composer: "pill" }, play: openFakerConversation };
@@ -410,4 +431,27 @@ export const Tall: Story = {
   args: { composer: "floating" },
   parameters: { frame: { width: "72rem", height: "52rem" } },
   play: openFakerConversation,
+};
+
+/**
+ * A container shorter than the conversation (a sidebar rail, a drawer): the
+ * thread scrolls inside the panel and the composer stays in view instead of
+ * being pushed past the panel's bottom edge.
+ */
+export const BoundedHeight: Story = {
+  ...Default,
+  parameters: { frame: { width: "24rem", height: "28rem" } },
+  render: (args) => (
+    <MockProvider agent={demoAgent}>
+      <ConversationsPanel {...args} />
+    </MockProvider>
+  ),
+  play: async (context) => {
+    await openFakerConversation(context);
+    const panel = context.canvasElement.querySelector(".cdny-panel")!;
+    const composer = context.canvasElement.querySelector(".cdny-composer")!;
+    const thread = context.canvasElement.querySelector(".cdny-thread-scroll [data-radix-scroll-area-viewport]")!;
+    await expect(composer.getBoundingClientRect().bottom).toBeLessThanOrEqual(panel.getBoundingClientRect().bottom);
+    await expect(thread.scrollHeight).toBeGreaterThan(thread.clientHeight);
+  },
 };

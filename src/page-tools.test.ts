@@ -50,3 +50,47 @@ describe("encodePageToolResult", () => {
     expect(encodePageToolResult(null)).toBe("null");
   });
 });
+
+describe("page tools store components", () => {
+  const Card = () => null;
+  const Other = () => null;
+  const ref = { id: "tool_123", name: "Card", externalId: "card" };
+
+  it("resolves components like handlers, external id first", () => {
+    const store = createPageToolsStore();
+    store.registerComponent("tool_123", Other);
+    store.registerComponent("card", Card);
+    expect(store.resolveComponent(ref)).toBe(Card);
+    expect(store.resolveComponent({ id: "tool_123", name: "Card" })).toBe(Other);
+    expect(store.resolveComponent(undefined)).toBeUndefined();
+  });
+
+  it("notifies subscribers and bumps the version on register and unregister", () => {
+    const store = createPageToolsStore();
+    let calls = 0;
+    const unsubscribe = store.subscribe(() => {
+      calls += 1;
+    });
+    const before = store.componentsVersion();
+
+    const unregister = store.registerComponent("card", Card);
+    expect(calls).toBe(1);
+    expect(store.componentsVersion()).not.toBe(before);
+
+    unregister();
+    expect(calls).toBe(2);
+    expect(store.resolveComponent(ref)).toBeUndefined();
+
+    unsubscribe();
+    store.registerComponent("card", Card);
+    expect(calls).toBe(2);
+  });
+
+  it("unregisters only its own component", () => {
+    const store = createPageToolsStore();
+    const unregisterFirst = store.registerComponent("card", Card);
+    store.registerComponent("card", Other);
+    unregisterFirst();
+    expect(store.resolveComponent(ref)).toBe(Other);
+  });
+});
