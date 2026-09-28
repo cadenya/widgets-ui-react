@@ -6,6 +6,96 @@
  * names are the stable contract for embedder CSS overrides.
  */
 
+/*
+ * Panel layout. The panel fills its container's height, so give the container
+ * a definite height (a fixed or viewport-relative height, or a bounded flex
+ * item); without one, `height: 100%` falls back to the content's height and
+ * the panel grows with the conversation. Inside the panel, the thread is the
+ * only region that grows and scrolls: flex items default to
+ * `min-height: auto` and would otherwise refuse to shrink below their content,
+ * pushing the composer out of the panel. Everything around the thread keeps
+ * its natural height.
+ */
+
+.cdny-panel-main,
+.cdny-panel-sidebar {
+  min-height: 0;
+}
+
+.cdny-thread-scroll,
+.cdny-list-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/*
+ * Scroll shadows: a soft fade at whichever edge of the thread has messages
+ * beyond it. MessageThread sets data-overflow-top / data-overflow-bottom as
+ * the reader scrolls. Tint with --cdny-scroll-shadow.
+ */
+.cdny-thread-scroll {
+  position: relative;
+}
+
+.cdny-thread-scroll::before,
+.cdny-thread-scroll::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: var(--space-5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.cdny-thread-scroll::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--cdny-scroll-shadow, var(--gray-a4)), transparent);
+}
+
+.cdny-thread-scroll::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--cdny-scroll-shadow, var(--gray-a4)), transparent);
+}
+
+.cdny-thread-scroll[data-overflow-top]::before,
+.cdny-thread-scroll[data-overflow-bottom]::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdny-thread-scroll::before,
+  .cdny-thread-scroll::after {
+    transition: none;
+  }
+}
+
+.cdny-panel-header,
+.cdny-panel-main > .cdny-error,
+.cdny-panel-main > .cdny-reconnecting,
+.cdny-activity,
+.cdny-composer,
+.cdny-composer-error {
+  flex-shrink: 0;
+}
+
+/* Empty and loading thread placeholders: centered, inset from the panel
+ * edges, and wrapped to a readable measure. */
+
+.cdny-thread-empty {
+  padding: var(--space-5);
+  text-align: center;
+  text-wrap: balance;
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+}
+
+.cdny-thread-empty > * {
+  max-width: 32ch;
+}
+
 /* Conversation list */
 
 .cdny-list-item {
@@ -262,6 +352,81 @@
   background: var(--gray-2);
 }
 
+/* Queued messages: a compact tray attached to the top of the composer, one
+ * line per message. Each variant matches its composer's width and shape; the
+ * composer squares off its top corners with cdny-composer-attached. */
+
+.cdny-queued {
+  flex-shrink: 0;
+  background: var(--gray-3);
+  border: 1px solid var(--gray-a6);
+  border-bottom: 0;
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+}
+
+.cdny-queued-list {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  list-style: none;
+}
+
+.cdny-queued-item {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--space-5);
+}
+
+.cdny-queued-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gray-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cdny-queued-remove {
+  flex-shrink: 0;
+}
+
+.cdny-queued-error {
+  padding: 0 var(--space-3) var(--space-1);
+  color: var(--red-11);
+  overflow-wrap: anywhere;
+}
+
+.cdny-queued-bar {
+  border-right: 0;
+  border-left: 0;
+}
+
+.cdny-composer-bar.cdny-composer-attached {
+  border-top: 0;
+}
+
+.cdny-queued-pill,
+.cdny-queued-floating {
+  border-radius: 20px 20px 0 0;
+}
+
+.cdny-queued-pill {
+  margin: var(--space-3) var(--space-3) 0;
+}
+
+.cdny-queued-floating {
+  margin: var(--space-2) var(--space-4) 0;
+  border-color: var(--gray-a5);
+}
+
+.cdny-composer-pill.cdny-composer-attached,
+.cdny-composer-floating.cdny-composer-attached {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 /* Markdown inside assistant bubbles */
 
 .cdny-bubble-assistant > :first-child {
@@ -347,4 +512,53 @@
   margin: var(--space-3) 0;
   border: 0;
   border-top: 1px solid var(--gray-a6);
+}
+
+/* Widgets Tools (`@cadenya/widgets-ui-react/widget-tools`) */
+
+.cdny-ask-user,
+.cdny-details {
+  max-width: 36rem;
+}
+
+.cdny-details-image {
+  flex-shrink: 0;
+  width: 5rem;
+  height: 5rem;
+  object-fit: cover;
+  border-radius: var(--radius-3);
+  background: var(--gray-a3);
+}
+
+.cdny-details-description {
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+}
+
+.cdny-details-description > :first-child {
+  margin-top: 0;
+}
+
+.cdny-details-description > :last-child {
+  margin-bottom: 0;
+}
+
+.cdny-details-description p,
+.cdny-details-description ul,
+.cdny-details-description ol {
+  margin: var(--space-2) 0;
+}
+
+.cdny-details-description ul,
+.cdny-details-description ol {
+  padding-left: var(--space-5);
+}
+
+.cdny-details-fields {
+  margin: 0;
+}
+
+.cdny-details-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }

@@ -39,13 +39,59 @@ export interface MessageThreadProps {
  * timeline, so once a later event for the same id carries text, the bubble
  * appears.
  */
+/**
+ * Marks which edges of the thread have content beyond them, so CSS can draw
+ * a soft shadow there (data-overflow-top / data-overflow-bottom on the
+ * .cdny-thread-scroll root).
+ */
+function markScrollEdges(viewport: HTMLElement) {
+  const root = viewport.closest<HTMLElement>(".cdny-thread-scroll");
+  if (!root) return;
+  const below = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+  root.toggleAttribute("data-overflow-top", viewport.scrollTop > 1);
+  root.toggleAttribute("data-overflow-bottom", below > 1);
+}
+
 export function MessageThread({ timeline, loading, responding, isWorkerActive, renderTool }: MessageThreadProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  // Whether the reader is at the newest message. Scrolling up to read
+  // history releases it; scrolling back to the bottom re-engages it.
+  const pinnedRef = useRef(true);
 
   useEffect(() => {
     const viewport = viewportRef.current;
-    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+    if (!viewport) return;
+    viewport.scrollTop = viewport.scrollHeight;
+    pinnedRef.current = true;
+    markScrollEdges(viewport);
   }, [timeline, loading]);
+
+  // The thread also changes size without a new event: the activity bar
+  // appears, the composer grows a line, the container resizes, rendered
+  // markdown reflows. Keep the newest message in view through those while the
+  // reader is pinned to it.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onScroll = () => {
+      pinnedRef.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 24;
+      markScrollEdges(viewport);
+    };
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    if (typeof ResizeObserver === "undefined") {
+      return () => viewport.removeEventListener("scroll", onScroll);
+    }
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) viewport.scrollTop = viewport.scrollHeight;
+      markScrollEdges(viewport);
+    });
+    observer.observe(viewport);
+    if (viewport.firstElementChild) observer.observe(viewport.firstElementChild);
+    return () => {
+      viewport.removeEventListener("scroll", onScroll);
+      observer.disconnect();
+    };
+  }, [loading]);
 
   if (loading) {
     return (
@@ -56,7 +102,7 @@ export function MessageThread({ timeline, loading, responding, isWorkerActive, r
   }
 
   return (
-    <ScrollArea ref={viewportRef} scrollbars="vertical" className="cdny-thread-scroll" style={{ flexGrow: 1 }}>
+    <ScrollArea ref={viewportRef} scrollbars="vertical" className="cdny-thread-scroll">
       <Flex className="cdny-thread" direction="column" gap="2" p="4">
         {timeline.map((item) => {
           switch (item.kind) {

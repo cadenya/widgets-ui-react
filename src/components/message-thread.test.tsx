@@ -116,6 +116,39 @@ describe("MessageThread auto-scroll", () => {
   });
 });
 
+describe("MessageThread scroll shadows", () => {
+  it("marks the edges that have messages beyond them as the reader scrolls", () => {
+    const { container } = render(<MessageThread timeline={[msg("u1", "user", "hi")]} />);
+    const root = container.querySelector<HTMLElement>(".cdny-thread-scroll")!;
+    const viewport = container.querySelector<HTMLElement>(".rt-ScrollAreaViewport")!;
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 640 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 200 });
+    const scrollTo = (top: number) => {
+      viewport.scrollTop = top;
+      viewport.dispatchEvent(new Event("scroll"));
+    };
+
+    scrollTo(440);
+    expect(root.hasAttribute("data-overflow-top")).toBe(true);
+    expect(root.hasAttribute("data-overflow-bottom")).toBe(false);
+
+    scrollTo(200);
+    expect(root.hasAttribute("data-overflow-top")).toBe(true);
+    expect(root.hasAttribute("data-overflow-bottom")).toBe(true);
+
+    scrollTo(0);
+    expect(root.hasAttribute("data-overflow-top")).toBe(false);
+    expect(root.hasAttribute("data-overflow-bottom")).toBe(true);
+  });
+
+  it("shows no shadow when the thread fits", () => {
+    const { container } = render(<MessageThread timeline={[msg("u1", "user", "hi")]} />);
+    const root = container.querySelector<HTMLElement>(".cdny-thread-scroll")!;
+    expect(root.hasAttribute("data-overflow-top")).toBe(false);
+    expect(root.hasAttribute("data-overflow-bottom")).toBe(false);
+  });
+});
+
 function tool(toolCallId: string, status: ToolItem["status"], args?: unknown): ToolItem {
   return {
     kind: "tool",

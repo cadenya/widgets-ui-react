@@ -104,11 +104,68 @@ with its `args` and `result` when the conversation is reopened. Nothing
 re-executes on reload — page tools only fire for calls still running, and
 bare tools that already have a result fold to `done`.
 
+## Widgets Tools template
+
+Cadenya's **Widgets Tools** tool set template (Tool Sets, Create, Use a
+template) creates three Bare tools the page answers itself. Everything the
+page needs for them is one element, from a separate entry point so apps that
+don't use the template don't bundle it:
+
+```tsx
+import { ConversationsPanel, PageToolsProvider } from "@cadenya/widgets-ui-react";
+import { WidgetTools } from "@cadenya/widgets-ui-react/widget-tools";
+
+<PageToolsProvider>
+  <WidgetTools pageContext={{ page: "invoice", invoiceId: invoice.id }} />
+  <ConversationsPanel toolPlacement="inline" />
+</PageToolsProvider>;
+```
+
+| Tool | Handled by | What it does |
+| --- | --- | --- |
+| `cdy_widget_ask_user` | `AskUser` component | Asks one to four questions, each answered with `radio_buttons`, `checkboxes` (optionally with an "Other" answer) or a `plain_text_input`, and sends `{"answers": {"<id>": answer}}`. The agent waits for it. |
+| `cdy_widget_display_details` | `DisplayDetails` component | Shows a card: linked title, subtitle, markdown description, image, label and value fields, link buttons. The template answers the agent immediately, so nothing is submitted. |
+| `cdy_widget_get_page_context` | the `pageContext` prop | Returns the prop's current value. Without it, the tool answers that the page shares nothing, so the agent never waits on it. |
+
+Keep `<WidgetTools>` rendered wherever the agent runs with this tool set:
+without it, `cdy_widget_ask_user` and `cdy_widget_get_page_context` calls
+wait for an answer that never comes. To restyle a tool, pass your own
+component: `<WidgetTools components={{ askUser: MyAskUser }} />`.
+
+The components read the call's exposed `args`, which the template's widget
+argument exposure overlay turns on. Model-supplied URLs render only when
+they are absolute `http(s)` URLs. `AskUser`, `DisplayDetails` and
+`WIDGET_TOOL_IDS` are exported too, for custom layouts.
+
+### Registering your own tools the same way
+
+`<WidgetTools>` is built on two hooks you can use for your own tools, under
+the same `<PageToolsProvider>`: `usePageTool(key, handler)` answers a call
+from the page, and `useToolComponent(key, Component)` renders one. A
+`ConversationsPanel` under the provider uses registered components alongside
+its `toolComponents` prop; the prop wins for the same tool.
+
+## Messages while the agent responds
+
+By default the visitor can keep typing while the agent works. Messages sent
+meanwhile are queued: they show in a compact tray attached to the composer,
+one line each, and can be removed until the agent picks them up before its
+next reply. To make the visitor wait for the reply instead:
+
+```tsx
+<ConversationsPanel queueWhileResponding={false} />
+```
+
+In a custom layout, `useConversation` exposes the queue: `send(message,
+{ enqueue: true })` queues when the agent is responding, `queuedMessages`
+lists what is waiting, and `removeQueuedMessage(id)` takes one back. Render
+them with `<QueuedMessages>` directly above a `<Composer attachedTop>`.
+
 ## Custom layouts
 
 `ConversationsPanel` is the batteries-included surface. For your own layout,
 compose the exported pieces: `ConversationList`, `MessageThread`, `Composer`,
-`ToolActivity`, the hooks (`useConversations`, `useConversation`,
+`QueuedMessages`, `ToolActivity`, the hooks (`useConversations`, `useConversation`,
 `useWidgetConfig`), the event→timeline projection (`applyEvents`,
 `activeTools`, `awaitingReply`), and `createAuthFetch`. `MessageThread`
 takes a `renderTool={(item) => …}` callback to draw tool items inline from

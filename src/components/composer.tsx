@@ -23,10 +23,15 @@ export interface ComposerProps {
    * floating: the capsule floats on a shadowed card over a matte main area.
    */
   variant?: ComposerVariant;
+  /**
+   * Square off the top corners so a tray rendered directly above (such as
+   * QueuedMessages) reads as attached to the composer.
+   */
+  attachedTop?: boolean;
 }
 
 /** Message input: Enter sends, Shift+Enter inserts a newline. */
-export function Composer({ onSend, disabled, placeholder, variant = "bar" }: ComposerProps) {
+export function Composer({ onSend, disabled, placeholder, variant = "bar", attachedTop = false }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +89,7 @@ export function Composer({ onSend, disabled, placeholder, variant = "bar" }: Com
 
   return (
     <>
-      <form className={`cdny-composer cdny-composer-${variant}`} onSubmit={submit}>
+      <form className={`cdny-composer cdny-composer-${variant}${attachedTop ? " cdny-composer-attached" : ""}`} onSubmit={submit}>
         <textarea
           ref={inputRef}
           className="cdny-composer-input"
