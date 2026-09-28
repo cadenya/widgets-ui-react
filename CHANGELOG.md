@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/cadenya/widgets-ui-react/compare/v0.3.0...v0.4.0) (2026-09-28)
+
+
+### Features
+
+* add &lt;WidgetTools&gt; and the @cadenya/widgets-ui-react/widget-tools entry with AskUser and DisplayDetails renderers ([09460b2](https://github.com/cadenya/widgets-ui-react/commit/09460b2efefb57a2654cc0a09b57782ac90e4ef4))
+* register tool renderers from anywhere under the provider with useToolComponent ([09460b2](https://github.com/cadenya/widgets-ui-react/commit/09460b2efefb57a2654cc0a09b57782ac90e4ef4))
+* show and remove queued conversation messages ([09460b2](https://github.com/cadenya/widgets-ui-react/commit/09460b2efefb57a2654cc0a09b57782ac90e4ef4))
+
+
+### Bug Fixes
+
+* preserve composer focus when submitting messages ([#20](https://github.com/cadenya/widgets-ui-react/issues/20)) ([844d33e](https://github.com/cadenya/widgets-ui-react/commit/844d33e1f8b2315fa8e76bc61f0c9e21680c8c10))
+
 ## [0.3.0](https://github.com/cadenya/widgets-ui-react/compare/v0.2.0...v0.3.0) (2026-09-16)
 
 
