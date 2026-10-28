@@ -145,6 +145,31 @@ from the page, and `useToolComponent(key, Component)` renders one. A
 `ConversationsPanel` under the provider uses registered components alongside
 its `toolComponents` prop; the prop wins for the same tool.
 
+## Client tools
+
+A client tool is defined entirely in the page; nothing needs to be set up in
+Cadenya first. `useClientTool` registers the definition and its handler, and
+every conversation started under the same `<PageToolsProvider>` sends the
+registered definitions, so the agent can call them in that conversation:
+
+```tsx
+useClientTool({
+  name: "getCartTotal",
+  description: "The visitor's current cart total in USD.",
+  parameters: { type: "object", properties: {} },
+  execute: () => ({ total: cart.total }),
+});
+```
+
+`name` is the function name the model calls (letters, digits, `_` and `-`).
+The handler gets the call's arguments and returns its result, encoded like a
+page tool's. Set `requiresApproval: true` to have the visitor confirm each
+call first. A client tool replaces an agent tool with the same name, and the
+tools a conversation starts with stay fixed for that conversation. Cadenya
+stores the definitions in a read-only tool set per agent, so client tool
+calls show up in tool analytics. Render calls with
+`useToolComponent("name:getCartTotal", Component)`.
+
 ## Messages while the agent responds
 
 By default the visitor can keep typing while the agent works. Messages sent

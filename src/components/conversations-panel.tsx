@@ -53,6 +53,11 @@ export interface ConversationsPanelProps {
    */
   queueWhileResponding?: boolean;
   /**
+   * Stream the agent's reply into the thread as it is generated. Off by
+   * default: the reply then appears whole once it is complete.
+   */
+  streamReplies?: boolean;
+  /**
    * Custom bubble colors. Each value is a full CSS background (gradients
    * work) or text color; unset values follow the surrounding Radix Theme.
    * Equivalent to setting the --cdny-bubble-* variables from CSS.
@@ -94,6 +99,7 @@ export function ConversationsPanel({
   toolPlacement = "activity",
   composer = "bar",
   queueWhileResponding = true,
+  streamReplies = false,
   bubbleColors,
   className,
 }: ConversationsPanelProps = {}) {
@@ -117,7 +123,7 @@ export function ConversationsPanel({
     denyToolCall,
     setToolCallContent,
     retry,
-  } = useConversation(selectedId);
+  } = useConversation(selectedId, { includeDeltas: streamReplies });
 
   const onSend = async (message: string) => {
     if (selectedId) {

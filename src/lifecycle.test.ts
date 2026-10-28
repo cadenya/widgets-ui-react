@@ -8,7 +8,7 @@ function pulse(at = now): WidgetEvent {
   return { id: "hb_pulse", conversationId: "obj_root", createdAt: new Date(at).toISOString(), type: "heartbeat", heartbeat: {} };
 }
 const waiting: WidgetEvent = {
-  id: "objevt_02", conversationId: "obj_root", createdAt: new Date(now).toISOString(), type: "stateChanged",
+  id: "objevt_02", sequence: 2, conversationId: "obj_root", createdAt: new Date(now).toISOString(), type: "stateChanged",
   stateChanged: { fromState: "WIDGET_OBJECTIVE_STATE_RUNNING", toState: "WIDGET_OBJECTIVE_STATE_WAITING" },
 };
 describe("objective lifecycle and liveness", () => {
@@ -29,9 +29,18 @@ describe("objective lifecycle and liveness", () => {
   });
   it("does not regress state on duplicate or out-of-order delivery", () => {
     const state = applyLifecycle(emptyLifecycle, waiting, false, now);
-    const older = { ...waiting, id: "objevt_01", stateChanged: { ...waiting.stateChanged, toState: "WIDGET_OBJECTIVE_STATE_RUNNING" } } as WidgetEvent;
+    const older = { ...waiting, id: "objevt_01", sequence: 1, stateChanged: { ...waiting.stateChanged, toState: "WIDGET_OBJECTIVE_STATE_RUNNING" } } as WidgetEvent;
     expect(applyLifecycle(state, older, true, now)).toBe(state);
     expect(applyLifecycle(state, waiting, true, now)).toBe(state);
+  });
+  it("orders state changes by sequence, not by event id", () => {
+    // An event id is minted before its transaction commits, so a later
+    // change can carry an id that sorts first.
+    const running = { ...waiting, id: "objevt_09", sequence: 1, stateChanged: { ...waiting.stateChanged, toState: "WIDGET_OBJECTIVE_STATE_RUNNING" } } as WidgetEvent;
+    const laterWithOlderId = { ...waiting, id: "objevt_01", sequence: 2 } as WidgetEvent;
+    const state = applyLifecycle(applyLifecycle(emptyLifecycle, running, true, now), laterWithOlderId, true, now);
+    expect(state.objectiveState).toBe("WIDGET_OBJECTIVE_STATE_WAITING");
+    expect(state.stateSequence).toBe(2);
   });
   it("stops the responding indicator on a durable terminal transition", () => {
     const active = applyLifecycle(emptyLifecycle, pulse(), true, now);

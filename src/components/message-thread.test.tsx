@@ -217,3 +217,27 @@ it("uses lifecycle state for long completions and keeps heartbeat updates from s
   rerender(<MessageThread timeline={timeline} responding={false} isWorkerActive />);
   expect(container.querySelector(".cdny-typing")).toBeNull();
 });
+
+describe("MessageThread streamed replies", () => {
+  const streamed = (text: string) =>
+    applyEvent([msg("u1", "user", "Hi")], event({
+      id: "dlt_1",
+      type: "assistantMessageDelta",
+      assistantMessageDelta: { completionId: "cmpl_a", text },
+    }));
+
+  it("renders the growing reply in place of the typing indicator", () => {
+    const { container } = render(<MessageThread timeline={streamed("Hel")} responding />);
+
+    const bubble = container.querySelector(".cdny-bubble-streaming");
+    expect(bubble?.textContent).toBe("Hel");
+    expect(bubble?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector(".cdny-typing")).toBeNull();
+  });
+
+  it("keeps the typing indicator until the reply has visible text", () => {
+    const { container } = render(<MessageThread timeline={streamed(" ")} responding />);
+
+    expect(container.querySelector(".cdny-typing")).not.toBeNull();
+  });
+});

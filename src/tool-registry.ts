@@ -43,8 +43,10 @@ export interface ToolRenderProps {
 
 /**
  * Looks a tool up by key: its external id first (as `external_id:<value>`,
- * then bare), falling back to the tool ULID. Shared by every tool registry so
- * they all resolve the same way.
+ * then bare), then the tool ULID. Client tools, which the page knows
+ * only by name, are also found as `name:<name>`; other tools never are, so
+ * an agent tool that shares a client tool's name never reaches the page's
+ * handler. Shared by every tool registry so they all resolve the same way.
  */
 export function lookupTool<T>(
   get: (key: string) => T | undefined,
@@ -55,7 +57,9 @@ export function lookupTool<T>(
     const byExternalId = get(`external_id:${tool.externalId}`) ?? get(tool.externalId);
     if (byExternalId) return byExternalId;
   }
-  return get(tool.id);
+  const byId = get(tool.id);
+  if (byId || !tool.clientTool) return byId;
+  return get(`name:${tool.name}`);
 }
 
 /**

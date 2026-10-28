@@ -94,3 +94,35 @@ describe("page tools store components", () => {
     expect(store.resolveComponent(ref)).toBe(Other);
   });
 });
+
+describe("page tools store client tools", () => {
+  it("resolves a client tool by name after external id and ulid", () => {
+    const store = createPageToolsStore();
+    const execute = () => "sunny";
+    store.registerClientTool({ name: "getWeather", description: "Weather" }, execute);
+
+    expect(store.resolve({ id: "tool_123", name: "getWeather", clientTool: true })).toBe(execute);
+    const byUlid = () => "ulid";
+    store.register("tool_123", byUlid);
+    expect(store.resolve({ id: "tool_123", name: "getWeather", clientTool: true })).toBe(byUlid);
+  });
+
+  it("does not resolve an agent tool that shares a client tool's name", () => {
+    const store = createPageToolsStore();
+    store.registerClientTool({ name: "getWeather" }, noop);
+
+    expect(store.resolve({ id: "tool_123", name: "getWeather" })).toBeUndefined();
+    expect(store.resolve({ id: "tool_123", name: "getWeather", clientTool: false })).toBeUndefined();
+  });
+
+  it("lists registered definitions and drops them on unregister", () => {
+    const store = createPageToolsStore();
+    const unregister = store.registerClientTool({ name: "getWeather" }, noop);
+    store.registerClientTool({ name: "getTime" }, noop);
+    expect(store.clientTools().map((d) => d.name)).toEqual(["getWeather", "getTime"]);
+
+    unregister();
+    expect(store.clientTools().map((d) => d.name)).toEqual(["getTime"]);
+    expect(store.resolve({ id: "tool_1", name: "getWeather", clientTool: true })).toBeUndefined();
+  });
+});

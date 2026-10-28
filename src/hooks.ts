@@ -1,9 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import type { CadenyaWidgets, WidgetConfig, WidgetConversation, WidgetEvent, WidgetQueuedMessage } from "@cadenya/widgets";
+import type {
+  CadenyaWidgets,
+  ConversationCreateParams,
+  WidgetConfig,
+  WidgetConversation,
+  WidgetEvent,
+  WidgetQueuedMessage,
+} from "@cadenya/widgets";
 import { useWidgetClient } from "./context.js";
-import { applyEvent, applyEvents, type TimelineItem } from "./timeline.js";
+import { usePageToolsStore } from "./page-tools.js";
+import { applyEvent, applyEvents, dropStreaming, type TimelineItem } from "./timeline.js";
 import { applyLifecycle, emptyLifecycle, HEARTBEAT_FRESHNESS_MS, type Lifecycle, type ObjectiveState } from "./lifecycle.js";
 import { subscribeToConversation } from "./conversation-stream.js";
 
@@ -30,17 +38,28 @@ export function useWidgetConfig(): WidgetConfig | null {
   return config;
 }
 
+/**
+ * Options for starting a conversation: the create request's fields other
+ * than the message. `clientTools` replaces the provider's registered ones.
+ */
+export type CreateConversationOptions = Omit<ConversationCreateParams, "message">;
+
 export interface UseConversationsResult {
   conversations: WidgetConversation[];
   loading: boolean;
   error: string | null;
-  /** Start a conversation with the visitor's first message. */
-  create: (message: string) => Promise<WidgetConversation>;
+  /**
+   * Start a conversation with the visitor's first message. It carries the
+   * client tools registered under the surrounding PageToolsProvider, or
+   * `options.clientTools` when given.
+   */
+  create: (message: string, options?: CreateConversationOptions) => Promise<WidgetConversation>;
   refresh: () => Promise<void>;
 }
 
 export function useConversations(): UseConversationsResult {
   const client = useWidgetClient();
+  const pageTools = usePageToolsStore();
   const [conversations, setConversations] = useState<WidgetConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +82,18 @@ export function useConversations(): UseConversationsResult {
   }, [refresh]);
 
   const create = useCallback(
-    async (message: string) => {
-      const conversation = await client.conversations.create({ message });
+    async (message: string, options?: CreateConversationOptions) => {
+      const definitions = pageTools?.clientTools() ?? [];
+      const clientTools =
+        options?.clientTools ?? (definitions.length > 0 ? { definitions } : undefined);
+      const conversation = await client.conversations.create({
+        message,
+        ...(clientTools ? { clientTools } : {}),
+      });
       setConversations((prev) => [conversation, ...prev]);
       return conversation;
     },
-    [client],
+    [client, pageTools],
   );
 
   return { conversations, loading, error, create, refresh };
@@ -122,7 +147,9 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
     case "expired":
       return state.lifecycle.lastHeartbeatAt !== action.at ? state : { ...state, lifecycle: { ...state.lifecycle, lastHeartbeatAt: null } };
     case "reconnecting":
-      return { ...state, reconnecting: action.reconnecting };
+      // A reconnected stream never resends partial text, so a reply that was
+      // streaming when the connection dropped arrives whole instead.
+      return { ...state, reconnecting: action.reconnecting, timeline: action.reconnecting ? dropStreaming(state.timeline) : state.timeline };
     case "error":
       return { ...state, loading: false, reconnecting: false, error: action.message };
   }
@@ -138,6 +165,11 @@ type QueueState = {
   conversationId: string | null;
   items: WidgetQueuedMessage[];
 };
+
+export interface UseConversationOptions {
+  /** Stream the assistant's reply into the timeline as it is generated. */
+  includeDeltas?: boolean;
+}
 
 export interface UseConversationResult {
   /** Precise lifecycle once observed in history or the live stream. */
@@ -181,8 +213,13 @@ export interface UseConversationResult {
  * loading, no error. Switching from a conversation to null tears down its
  * stream and clears its timeline and error, so a composer bound to
  * `loading` is usable for the first message.
+ *
+ * With `includeDeltas`, the assistant's reply streams into the timeline as
+ * it is generated: a message item with `streaming: true` grows until the
+ * durable assistant message replaces it.
  */
-export function useConversation(conversationId: string | null): UseConversationResult {
+export function useConversation(conversationId: string | null, options: UseConversationOptions = {}): UseConversationResult {
+  const includeDeltas = options.includeDeltas ?? false;
   const client = useWidgetClient();
   const [state, dispatch] = useReducer(threadReducer, conversationId, (id) => ({
     client,
@@ -239,6 +276,7 @@ export function useConversation(conversationId: string | null): UseConversationR
       client,
       conversationId,
       signal: controller.signal,
+      includeDeltas,
       onHistory: (events) => dispatch({ type: "backfilled", events }),
       onEvent: (event) => {
         dispatch({ type: "event", event });
@@ -253,7 +291,7 @@ export function useConversation(conversationId: string | null): UseConversationR
     });
 
     return () => controller.abort();
-  }, [client, conversationId, subscriptionAttempt]);
+  }, [client, conversationId, includeDeltas, subscriptionAttempt]);
 
   const retry = useCallback(() => setSubscriptionAttempt((attempt) => attempt + 1), []);
 

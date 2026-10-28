@@ -32,7 +32,11 @@ export interface AgentContext {
    * that event in place (how streaming partials grow into their final text).
    */
   emit: (event: EventInput) => WidgetEvent;
-  /** Emit an assistant message that grows word by word under one event id. */
+  /**
+   * Generate an assistant message word by word, as the real stream does:
+   * transient deltas to streams that asked for them, then the durable
+   * message with the same completion id.
+   */
   stream: (content: string, opts?: { delay?: number; chunk?: number }) => Promise<WidgetEvent>;
   sleep: (ms: number) => Promise<void>;
   /** Resolves when the visitor approves or denies the given tool call. */
@@ -97,7 +101,13 @@ interface ConversationRecord {
   events: WidgetEvent[];
   /** Messages sent while the agent was responding, waiting for its next turn. */
   queued: WidgetQueuedMessage[];
-  subscribers: Set<(event: WidgetEvent) => void>;
+  subscribers: Set<Subscriber>;
+}
+
+/** An open stream: durable events reach every one, deltas only those that asked. */
+interface Subscriber {
+  includeDeltas: boolean;
+  push: (event: WidgetEvent) => void;
 }
 
 interface Waiters {
@@ -109,16 +119,20 @@ function createStream(
   record: ConversationRecord,
   signal: AbortSignal | undefined,
   lastEventId: string | undefined,
+  includeDeltas: boolean,
 ): AsyncIterable<WidgetEvent> & { lastEventId: string | undefined } {
   // Replay anything emitted after the caller's checkpoint, then go live.
   const start = lastEventId ? record.events.findIndex((e) => e.id === lastEventId) + 1 : 0;
   const queue: WidgetEvent[] = record.events.slice(start);
   let wake: (() => void) | null = null;
-  const onEvent = (event: WidgetEvent) => {
-    queue.push(event);
-    wake?.();
+  const subscriber: Subscriber = {
+    includeDeltas,
+    push: (event) => {
+      queue.push(event);
+      wake?.();
+    },
   };
-  record.subscribers.add(onEvent);
+  record.subscribers.add(subscriber);
 
   const stream = {
     lastEventId,
@@ -127,7 +141,8 @@ function createStream(
         while (!signal?.aborted) {
           const next = queue.shift();
           if (next) {
-            stream.lastEventId = next.id;
+            // Deltas are never resume points, as on the real stream.
+            if (!next.id.startsWith("dlt_")) stream.lastEventId = next.id;
             yield next;
             continue;
           }
@@ -138,7 +153,7 @@ function createStream(
           wake = null;
         }
       } finally {
-        record.subscribers.delete(onEvent);
+        record.subscribers.delete(subscriber);
       }
     },
   };
@@ -193,8 +208,22 @@ export function createMockClient(options: MockClientOptions = {}) {
     if (existing >= 0) record.events[existing] = event;
     else record.events.push(event);
     record.conversation.lastActiveAt = event.createdAt;
-    for (const subscriber of record.subscribers) subscriber(event);
+    for (const subscriber of record.subscribers) subscriber.push(event);
     return event;
+  };
+
+  // A delta is live-only: never stored, sent only to streams that asked.
+  const emitDelta = (conversationId: string, completionId: string, text: string) => {
+    const event = {
+      id: ulidish("dlt"),
+      conversationId,
+      createdAt: new Date().toISOString(),
+      type: "assistantMessageDelta",
+      assistantMessageDelta: { completionId, text },
+    } as WidgetEvent;
+    for (const subscriber of get(conversationId).subscribers) {
+      if (subscriber.includeDeltas) subscriber.push(event);
+    }
   };
 
   const setResponding = (conversationId: string, responding: boolean) => {
@@ -216,19 +245,16 @@ export function createMockClient(options: MockClientOptions = {}) {
       history: () => [...record.events],
       emit: (input) => emit(conversationId, input),
       stream: async (content, { delay = 40, chunk = 2 } = {}) => {
+        const completionId = ulidish("cmpl");
         const words = content.split(/(?<=\s)/);
-        let event: WidgetEvent | undefined;
-        let acc = "";
         for (let i = 0; i < words.length; i += chunk) {
-          acc += words.slice(i, i + chunk).join("");
-          event = emit(conversationId, {
-            id: event?.id,
-            type: "assistantMessage",
-            assistantMessage: { content: acc },
-          });
+          emitDelta(conversationId, completionId, words.slice(i, i + chunk).join(""));
           await wait(delay);
         }
-        return event!;
+        return emit(conversationId, {
+          type: "assistantMessage",
+          assistantMessage: { content, completionId },
+        });
       },
       sleep: wait,
       waitForDecision: (toolCallId) =>
@@ -304,10 +330,11 @@ export function createMockClient(options: MockClientOptions = {}) {
       },
       streamEvents: async (
         id: string,
+        { includeDeltas = false }: { includeDeltas?: boolean } = {},
         { signal, lastEventId }: { signal?: AbortSignal; lastEventId?: string } = {},
       ) => {
         await net();
-        return createStream(get(id), signal, lastEventId);
+        return createStream(get(id), signal, lastEventId, includeDeltas);
       },
       continue: async (id: string, { message, enqueue }: { message: string; enqueue?: boolean }) => {
         await net();

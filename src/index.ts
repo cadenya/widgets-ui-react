@@ -4,12 +4,14 @@ export { createAuthFetch, type AuthFetch, type AuthFetchOptions } from "./auth-f
 export {
   PageToolsProvider,
   usePageTool,
+  useClientTool,
   usePageToolsStore,
   useToolComponent,
   encodePageToolResult,
   type PageToolHandler,
   type PageToolInvocation,
   type PageToolsStore,
+  type ClientToolOptions,
 } from "./page-tools.js";
 export { usePageToolExecution } from "./use-page-tool-execution.js";
 export {
@@ -17,14 +19,17 @@ export {
   useConversations,
   useWidgetConfig,
   type SendOptions,
+  type UseConversationOptions,
   type UseConversationResult,
   type UseConversationsResult,
+  type CreateConversationOptions,
 } from "./hooks.js";
 export {
   activeTools,
   applyEvent,
   applyEvents,
   awaitingReply,
+  STREAMING_ITEM_PREFIX,
   type MessageItem,
   type NoticeItem,
   type TimelineItem,

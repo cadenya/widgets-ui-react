@@ -109,7 +109,11 @@ export function MessageThread({ timeline, loading, responding, isWorkerActive, r
             case "message":
               if (!item.content.trim()) return null;
               return (
-                <div key={item.id} className={`cdny-bubble cdny-bubble-${item.role}`}>
+                <div
+                  key={item.id}
+                  className={`cdny-bubble cdny-bubble-${item.role}${item.streaming ? " cdny-bubble-streaming" : ""}`}
+                  aria-busy={item.streaming || undefined}
+                >
                   {item.role === "assistant" ? (
                     // react-markdown escapes raw HTML rather than rendering
                     // it, so agent output can't inject markup.
@@ -132,7 +136,7 @@ export function MessageThread({ timeline, loading, responding, isWorkerActive, r
               return <Notice key={item.id} item={item} />;
           }
         })}
-        {(responding ?? awaitingReply(timeline)) && (
+        {(responding ?? awaitingReply(timeline)) && !streamingText(timeline) && (
           <div className="cdny-bubble cdny-bubble-assistant cdny-typing" role="status" aria-label={isWorkerActive ? "Agent is responding; worker active" : "Agent is responding"}>
             <span />
             <span />
@@ -142,6 +146,12 @@ export function MessageThread({ timeline, loading, responding, isWorkerActive, r
       </Flex>
     </ScrollArea>
   );
+}
+
+/** The growing reply already shows the agent is responding. */
+function streamingText(timeline: TimelineItem[]): boolean {
+  const last = timeline.at(-1);
+  return last?.kind === "message" && last.streaming === true && last.content.trim() !== "";
 }
 
 const NOTICE_LABEL: Record<NoticeItem["notice"], string> = {

@@ -33,11 +33,12 @@ const meta = {
       },
     },
   },
-  args: { composer: "bar" },
+  args: { composer: "bar", streamReplies: true },
   argTypes: {
     composer: { control: "inline-radio", options: ["bar", "pill", "floating"] },
     toolPlacement: { control: "inline-radio", options: ["activity", "inline"] },
     queueWhileResponding: { control: "boolean" },
+    streamReplies: { control: "boolean" },
     bubbleColors: { control: "object" },
     toolComponents: { table: { disable: true } },
     className: { table: { disable: true } },
@@ -97,6 +98,26 @@ export const QueueWhileResponding: Story = {
 export const WaitForReply: Story = {
   ...QueueWhileResponding,
   args: { composer: "floating", queueWhileResponding: false },
+};
+
+/** With streamReplies, the reply grows as the agent generates it. */
+export const StreamedReplies: Story = {
+  args: { composer: "floating", streamReplies: true },
+  render: (args) => (
+    <MockProvider agent={echoAgent}>
+      <ConversationsPanel {...args} />
+      <Hint>
+        Send a message: the reply streams in word by word from text deltas, then the final
+        message replaces it in place. Compare with Whole Replies.
+      </Hint>
+    </MockProvider>
+  ),
+};
+
+/** Without streamReplies, the reply appears once it is complete. */
+export const WholeReplies: Story = {
+  ...StreamedReplies,
+  args: { composer: "floating", streamReplies: false },
 };
 
 export const Pill: Story = { ...Default, args: { composer: "pill" }, play: openFakerConversation };
