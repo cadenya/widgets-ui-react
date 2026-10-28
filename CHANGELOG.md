@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/cadenya/widgets-ui-react/compare/v0.4.0...v0.5.0) (2026-10-28)
+
+
+### Features
+
+* client tools and streamed assistant replies ([8dacf2e](https://github.com/cadenya/widgets-ui-react/commit/8dacf2eb9359391eea067e5897e7345adf7a933f))
+
 ## [0.4.0](https://github.com/cadenya/widgets-ui-react/compare/v0.3.0...v0.4.0) (2026-09-28)
 
 
