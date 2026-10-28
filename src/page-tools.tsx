@@ -9,7 +9,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import type { WidgetToolReference } from "@cadenya/widgets";
+import type { ClientToolDefinition, WidgetToolReference } from "@cadenya/widgets";
 import { lookupTool, type ToolRenderProps } from "./tool-registry.js";
 
 /**
@@ -30,14 +30,19 @@ import { lookupTool, type ToolRenderProps } from "./tool-registry.js";
  * addition to its own toolComponents prop. That lets a single element (such
  * as <WidgetTools>) bring both the renderers and the handlers a set of tools
  * needs.
+ *
+ * Client tools need no setup in Cadenya at all: useClientTool registers a
+ * definition (name, description, JSON Schema parameters) with its handler,
+ * and conversations created under the provider send every registered
+ * definition so the agent can call them in that conversation.
  */
 
 export interface PageToolInvocation {
   toolCallId: string;
   tool: WidgetToolReference;
   /**
-   * The call's arguments, for tools opted into sharing arguments with widget
-   * sessions. Absent for tools that haven't opted in.
+   * The call's arguments, for client tools and for tools opted into sharing
+   * arguments with widget sessions. Absent for tools that haven't opted in.
    */
   args?: unknown;
 }
@@ -51,6 +56,13 @@ export type PageToolHandler = (invocation: PageToolInvocation) => Promise<unknow
 
 export interface PageToolsStore {
   register(key: string, handler: PageToolHandler): () => void;
+  /**
+   * Registers a client tool: its definition, sent when a conversation is
+   * created, and the handler that executes its calls.
+   */
+  registerClientTool(definition: ClientToolDefinition, handler: PageToolHandler): () => void;
+  /** The definitions of the registered client tools. */
+  clientTools(): ClientToolDefinition[];
   resolve(tool: WidgetToolReference | undefined): PageToolHandler | undefined;
   /** Registers a component that renders calls to the tool with this key. */
   registerComponent(key: string, component: ComponentType<ToolRenderProps>): () => void;
@@ -65,6 +77,7 @@ const PageToolsContext = createContext<PageToolsStore | null>(null);
 
 export function createPageToolsStore(): PageToolsStore {
   const handlers = new Map<string, PageToolHandler>();
+  const clientDefinitions = new Map<string, ClientToolDefinition>();
   const components = new Map<string, ComponentType<ToolRenderProps>>();
   const listeners = new Set<() => void>();
   let version = 0;
@@ -82,6 +95,20 @@ export function createPageToolsStore(): PageToolsStore {
     },
     resolve(tool) {
       return lookupTool((key) => handlers.get(key), tool);
+    },
+    registerClientTool(definition, handler) {
+      const key = `name:${definition.name}`;
+      handlers.set(key, handler);
+      clientDefinitions.set(definition.name, definition);
+      return () => {
+        if (handlers.get(key) === handler) {
+          handlers.delete(key);
+          clientDefinitions.delete(definition.name);
+        }
+      };
+    },
+    clientTools() {
+      return [...clientDefinitions.values()];
     },
     registerComponent(key, component) {
       components.set(key, component);
@@ -161,4 +188,42 @@ export function encodePageToolResult(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === undefined) return JSON.stringify({ ok: true });
   return JSON.stringify(value);
+}
+
+/** A client tool: its definition plus the handler that executes its calls. */
+export interface ClientToolOptions extends ClientToolDefinition {
+  execute: PageToolHandler;
+}
+
+/**
+ * Define a tool the page executes, with no tool set to configure in Cadenya.
+ * Conversations created under the same provider (useConversations().create
+ * or a ConversationsPanel) send the definition, so the agent can call the
+ * tool by name in that conversation; a mounted ConversationsPanel runs
+ * `execute` for each call and returns its result. A client tool replaces an
+ * agent tool with the same name. Tools registered after a conversation
+ * starts are not added to it. Register components for its calls with
+ * useToolComponent(`name:<name>`, …).
+ */
+export function useClientTool({ execute, ...definition }: ClientToolOptions): void {
+  const store = useContext(PageToolsContext);
+  if (!store) {
+    throw new Error("Cadenya widgets: useClientTool requires a <PageToolsProvider> ancestor.");
+  }
+
+  const executeRef = useRef(execute);
+  useEffect(() => {
+    executeRef.current = execute;
+  });
+
+  // Re-register only when the definition's content changes, not on every
+  // render's fresh object.
+  const definitionKey = JSON.stringify(definition);
+  useEffect(
+    () =>
+      store.registerClientTool(JSON.parse(definitionKey) as ClientToolDefinition, (invocation) =>
+        executeRef.current(invocation),
+      ),
+    [store, definitionKey],
+  );
 }

@@ -4,6 +4,8 @@ type Subscription = {
   client: CadenyaWidgets;
   conversationId: string;
   signal: AbortSignal;
+  /** Also stream the assistant's text deltas as they are generated. */
+  includeDeltas?: boolean;
   onHistory: (events: WidgetEvent[]) => void;
   onEvent: (event: WidgetEvent) => void;
   onReconnecting?: (reconnecting: boolean) => void;
@@ -54,13 +56,13 @@ async function streamTail(
   subscription: Subscription,
   lastEventId: string | undefined,
 ): Promise<void> {
-  const { client, conversationId, signal, onEvent, onReconnecting } = subscription;
+  const { client, conversationId, signal, includeDeltas, onEvent, onReconnecting } = subscription;
   let attempts = 0;
   while (!signal.aborted) {
     try {
       // Own the outer recovery loop so its lifetime follows the component,
       // rather than the SDK's per-outage retry budget.
-      const stream = await client.conversations.streamEvents(conversationId, {
+      const stream = await client.conversations.streamEvents(conversationId, includeDeltas ? { includeDeltas } : {}, {
         signal,
         lastEventId,
         reconnect: false,

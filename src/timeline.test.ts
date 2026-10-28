@@ -115,6 +115,62 @@ describe("assistant streaming snapshots", () => {
   });
 });
 
+describe("assistant text deltas", () => {
+  function delta(id: string, completionId: string, text: string): WidgetEvent {
+    return event({ id, type: "assistantMessageDelta", assistantMessageDelta: { completionId, text } });
+  }
+  const start = applyEvents([], [event({ id: "u1", sequence: 1, type: "userMessage", userMessage: { content: "Hi" } })]);
+
+  it("grows one streaming bubble per completion, after what came before it", () => {
+    const items = applyEvents(start, [delta("dlt_1", "cmpl_a", "Hel"), delta("dlt_2", "cmpl_a", "lo")]);
+
+    expect(items).toHaveLength(2);
+    expect(items[1]).toMatchObject({ kind: "message", role: "assistant", content: "Hello", streaming: true });
+    expect(awaitingReply(items)).toBe(false);
+  });
+
+  it("replaces the streaming bubble with the durable message", () => {
+    const items = applyEvents(start, [
+      delta("dlt_1", "cmpl_a", "Hel"),
+      event({ id: "e2", sequence: 2, type: "assistantMessage", assistantMessage: { content: "Hello", completionId: "cmpl_a" } }),
+    ]);
+
+    expect(items).toHaveLength(2);
+    expect(items[1]).toMatchObject({ id: "e2", content: "Hello" });
+    expect((items[1] as MessageItem).streaming).toBeUndefined();
+  });
+
+  it("drops a retried completion's text when the retry's message lands", () => {
+    const items = applyEvents(start, [
+      delta("dlt_1", "cmpl_a", "Half a rep"),
+      delta("dlt_2", "cmpl_b", "Hello"),
+      event({ id: "e2", sequence: 2, type: "assistantMessage", assistantMessage: { content: "Hello", completionId: "cmpl_b" } }),
+    ]);
+
+    expect(items.map((i) => i.id)).toEqual(["u1", "e2"]);
+  });
+
+  it.each([
+    ["an error", event({ id: "e2", sequence: 2, type: "error", error: { message: "boom" } })],
+    ["a cancellation", event({ id: "e2", sequence: 2, type: "cancelled", cancelled: {} })],
+    ["a timeout", event({ id: "e2", sequence: 2, type: "timedOut", timedOut: {} })],
+    ["the conversation settling", event({ id: "e2", sequence: 2, type: "stateChanged", stateChanged: { toState: "WIDGET_OBJECTIVE_STATE_WAITING" } })],
+  ])("drops unfinished text on %s", (_label, ending) => {
+    const items = applyEvents(start, [delta("dlt_1", "cmpl_a", "Hel"), ending]);
+
+    expect(items.some((i) => i.kind === "message" && i.streaming)).toBe(false);
+  });
+
+  it("keeps streaming while the conversation is still running", () => {
+    const items = applyEvents(start, [
+      delta("dlt_1", "cmpl_a", "Hel"),
+      event({ id: "e2", sequence: 2, type: "stateChanged", stateChanged: { toState: "WIDGET_OBJECTIVE_STATE_RUNNING" } }),
+    ]);
+
+    expect(items.at(-1)).toMatchObject({ content: "Hel", streaming: true });
+  });
+});
+
 describe("tool call lifecycle folding", () => {
   const tool = { id: "tool_1", name: "LookupOrder" };
 
@@ -335,5 +391,31 @@ describe("notices", () => {
   it("ignores unknown event types for forward compatibility", () => {
     const items = applyEvent([], event({ id: "e1", type: "somethingNew", somethingNew: {} }));
     expect(items).toHaveLength(0);
+  });
+});
+
+describe("sequence order", () => {
+  const user = (id: string, sequence: number) =>
+    event({ id, sequence, type: "userMessage", userMessage: { content: id } });
+  const reply = (id: string, sequence: number) =>
+    event({ id, sequence, type: "assistantMessage", assistantMessage: { content: id } });
+
+  it("places an event folded late at its sequence", () => {
+    const items = applyEvents([], [user("objevt_a", 1), reply("objevt_c", 3), reply("objevt_b", 2)]);
+
+    expect(items.map((i) => i.id)).toEqual(["objevt_a", "objevt_b", "objevt_c"]);
+  });
+
+  it("places a tool call that arrives late at its sequence", () => {
+    const called = event({ id: "objevt_t", sequence: 2, type: "toolCalled", toolCalled: { toolCallId: "call_1" } });
+    const items = applyEvents([], [user("objevt_a", 1), reply("objevt_c", 3), called]);
+
+    expect(items.map((i) => i.id)).toEqual(["objevt_a", "objevt_t", "objevt_c"]);
+  });
+
+  it("dedupes a message by its sequence", () => {
+    const items = applyEvents([], [reply("objevt_b", 2), reply("objevt_b_copy", 2)]);
+
+    expect(items).toHaveLength(1);
   });
 });

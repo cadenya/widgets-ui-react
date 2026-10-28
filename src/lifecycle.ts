@@ -6,10 +6,12 @@ export interface Lifecycle {
   conversationState: WidgetConversation["state"] | null;
   objectiveState: ObjectiveState | null;
   stateEventId: string | null;
+  /** Sequence of the state change the state came from; later changes have higher ones. */
+  stateSequence: number | null;
   lastHeartbeatAt: number | null;
 }
 export const emptyLifecycle: Lifecycle = {
-  conversationState: null, objectiveState: null, stateEventId: null, lastHeartbeatAt: null,
+  conversationState: null, objectiveState: null, stateEventId: null, stateSequence: null, lastHeartbeatAt: null,
 };
 
 function conversationState(state: ObjectiveState): WidgetConversation["state"] {
@@ -25,6 +27,17 @@ function conversationState(state: ObjectiveState): WidgetConversation["state"] {
   }
 }
 
+/**
+ * Sequences follow commit order, so a duplicate or a change older than the
+ * one already applied never moves the state backwards. Events from a server
+ * that predates sequences fall back to comparing ids.
+ */
+function isLaterState(state: Lifecycle, event: WidgetEvent): boolean {
+  if (state.stateEventId === null) return true;
+  if (event.sequence && state.stateSequence) return event.sequence > state.stateSequence;
+  return event.id > state.stateEventId;
+}
+
 /** Activity observations never infer a lifecycle transition, including child pulses. */
 export function applyLifecycle(state: Lifecycle, event: WidgetEvent, live: boolean, now = Date.now()): Lifecycle {
   if (event.type === "heartbeat") {
@@ -33,12 +46,11 @@ export function applyLifecycle(state: Lifecycle, event: WidgetEvent, live: boole
     if (!Number.isFinite(at) || Math.abs(now - at) > HEARTBEAT_FRESHNESS_MS || at <= (state.lastHeartbeatAt ?? 0)) return state;
     return { ...state, lastHeartbeatAt: Math.min(at, now) };
   }
-  if (event.type !== "stateChanged" || !event.id.startsWith("objevt_") ||
-    (state.stateEventId !== null && event.id <= state.stateEventId)) return state;
+  if (event.type !== "stateChanged" || !event.id.startsWith("objevt_") || !isLaterState(state, event)) return state;
   const objectiveState = event.stateChanged.toState;
   const next = conversationState(objectiveState);
   return {
-    ...state, objectiveState, conversationState: next, stateEventId: event.id,
+    ...state, objectiveState, conversationState: next, stateEventId: event.id, stateSequence: event.sequence ?? null,
     lastHeartbeatAt: next === "STATE_CLOSED" ? null : state.lastHeartbeatAt,
   };
 }

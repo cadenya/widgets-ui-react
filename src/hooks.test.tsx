@@ -30,7 +30,7 @@ function fakeClient(history: Record<string, WidgetEvent[] | Error>) {
         if (entry instanceof Error) throw entry;
         return { items: entry ?? [], nextCursor: undefined };
       }),
-      streamEvents: vi.fn(async (conversationId: string, { signal }: { signal: AbortSignal }) => {
+      streamEvents: vi.fn(async (conversationId: string, _params: unknown, { signal }: { signal: AbortSignal }) => {
         streams.push({ conversationId, signal });
         return {
           lastEventId: undefined,
@@ -127,6 +127,64 @@ describe("useConversation(null)", () => {
   });
 });
 
+describe("useConversation streamed replies", () => {
+  function deltaClient() {
+    let endFirstStream!: () => void;
+    const firstStreamEnded = new Promise<void>((resolve) => { endFirstStream = resolve; });
+    const streamEvents = vi.fn(async (_id: string, _params: unknown, { signal }: { signal: AbortSignal }) => {
+      const first = streamEvents.mock.calls.length === 1;
+      return {
+        lastEventId: undefined,
+        async *[Symbol.asyncIterator]() {
+          if (first) {
+            yield {
+              id: "dlt_1",
+              conversationId: "c1",
+              createdAt: "2026-08-14T00:00:01Z",
+              type: "assistantMessageDelta",
+              assistantMessageDelta: { completionId: "cmpl_a", text: "Hel" },
+            } as WidgetEvent;
+            await firstStreamEnded;
+            return;
+          }
+          await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+        },
+      };
+    });
+    const client = {
+      conversations: {
+        listEvents: vi.fn(async () => ({ items: [event("objevt_u1", "Hi")], nextCursor: undefined })),
+        streamEvents,
+      },
+    } as unknown as CadenyaWidgets;
+    return { client, streamEvents, endFirstStream };
+  }
+
+  it("asks for deltas only when opted in", async () => {
+    const plain = deltaClient();
+    renderHook(() => useConversation("c1"), { wrapper: wrapperFor(plain.client) });
+    await waitFor(() => expect(plain.streamEvents).toHaveBeenCalled());
+    expect(plain.streamEvents.mock.calls[0][1]).toEqual({});
+
+    const streaming = deltaClient();
+    renderHook(() => useConversation("c1", { includeDeltas: true }), { wrapper: wrapperFor(streaming.client) });
+    await waitFor(() => expect(streaming.streamEvents).toHaveBeenCalled());
+    expect(streaming.streamEvents.mock.calls[0][1]).toEqual({ includeDeltas: true });
+  });
+
+  it("shows the streaming reply and drops it when the stream reconnects", async () => {
+    const { client, endFirstStream } = deltaClient();
+    const { result } = renderHook(() => useConversation("c1", { includeDeltas: true }), { wrapper: wrapperFor(client) });
+
+    await waitFor(() => expect(result.current.timeline.at(-1)).toMatchObject({ content: "Hel", streaming: true }));
+
+    act(() => endFirstStream());
+
+    await waitFor(() => expect(result.current.reconnecting).toBe(true));
+    expect(result.current.timeline.map((item) => item.id)).toEqual(["objevt_u1"]);
+  });
+});
+
 describe("useConversation async isolation", () => {
   it("does not merge a late history page into a newly selected conversation", async () => {
     const { client } = fakeClient({ c2: [event("e2", "current")] });
@@ -161,7 +219,7 @@ it("expires worker liveness without changing lifecycle or rebuilding the timelin
   try {
     const { client } = fakeClient({ c: [] });
     client.conversations.retrieve = vi.fn().mockResolvedValue({ id: "c", state: "STATE_OPEN" });
-    client.conversations.streamEvents = vi.fn().mockImplementation(async (_id, { signal }) => ({
+    client.conversations.streamEvents = vi.fn().mockImplementation(async (_id, _params, { signal }) => ({
       async *[Symbol.asyncIterator]() {
         yield { id: "hb_pulse", conversationId: "c", createdAt: new Date().toISOString(), type: "heartbeat", heartbeat: {} };
         await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
@@ -191,7 +249,7 @@ function queueClient(initial: WidgetQueuedMessage[]) {
   const { client } = fakeClient({ c: [] });
   const server = { queue: [...initial] };
   let push!: (event: WidgetEvent) => void;
-  client.conversations.streamEvents = vi.fn().mockImplementation(async (_id, { signal }: { signal: AbortSignal }) => ({
+  client.conversations.streamEvents = vi.fn().mockImplementation(async (_id, _params: unknown, { signal }: { signal: AbortSignal }) => ({
     async *[Symbol.asyncIterator]() {
       const pending: WidgetEvent[] = [];
       let wake: (() => void) | null = null;

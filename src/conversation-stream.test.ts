@@ -10,7 +10,7 @@ function deferred<T>() {
 const event = (id: string) => ({ id } as WidgetEvent);
 const emptyStream = () => ({ async *[Symbol.asyncIterator]() {} });
 
-function setup() {
+function setup(options: { includeDeltas?: boolean } = {}) {
   const controller = new AbortController();
   const listEvents = vi.fn().mockResolvedValue({ items: [event("objevt_e1")] });
   const streamEvents = vi.fn().mockResolvedValue(emptyStream());
@@ -19,7 +19,7 @@ function setup() {
   const onReconnecting = vi.fn();
   const run = () => subscribeToConversation({
     client: { conversations: { listEvents, streamEvents } } as unknown as CadenyaWidgets,
-    conversationId: "c1", signal: controller.signal, onHistory, onEvent, onReconnecting,
+    conversationId: "c1", signal: controller.signal, onHistory, onEvent, onReconnecting, ...options,
   });
   return { controller, listEvents, streamEvents, onHistory, onEvent, onReconnecting, run };
 }
@@ -40,10 +40,33 @@ describe("conversation subscription", () => {
     page.resolve({ items: [event("objevt_e2")] });
     await running;
     expect(s.onHistory).toHaveBeenCalledExactlyOnceWith([event("objevt_e1"), event("objevt_e2")]);
-    expect(s.streamEvents).toHaveBeenCalledWith("c1", {
+    expect(s.streamEvents).toHaveBeenCalledWith("c1", {}, {
       signal: s.controller.signal, lastEventId: "objevt_e2", reconnect: false,
     });
     expect(s.listEvents).toHaveBeenLastCalledWith("c1", { cursor: "page2" }, { signal: s.controller.signal });
+  });
+
+  it("asks for text deltas when opted in, and never resumes from one", async () => {
+    vi.useFakeTimers();
+    const s = setup({ includeDeltas: true });
+    s.streamEvents.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield event("objevt_e2");
+        yield event("dlt_1");
+      },
+    });
+    const running = s.run();
+    await vi.advanceTimersByTimeAsync(1000);
+    s.controller.abort();
+    await running;
+
+    expect(s.streamEvents).toHaveBeenNthCalledWith(1, "c1", { includeDeltas: true }, {
+      signal: s.controller.signal, lastEventId: "objevt_e1", reconnect: false,
+    });
+    expect(s.streamEvents).toHaveBeenNthCalledWith(2, "c1", { includeDeltas: true }, {
+      signal: s.controller.signal, lastEventId: "objevt_e2", reconnect: false,
+    });
+    expect(s.onEvent).toHaveBeenCalledWith(event("dlt_1"));
   });
 
   it("ignores late history and stops pagination after cancellation", async () => {
@@ -78,7 +101,7 @@ describe("conversation subscription", () => {
     const running = s.run();
     await vi.advanceTimersByTimeAsync(1000);
     expect(s.streamEvents).toHaveBeenCalledTimes(2);
-    expect(s.streamEvents.mock.calls[1][1].lastEventId).toBe("objevt_ping-checkpoint");
+    expect(s.streamEvents.mock.calls[1][2].lastEventId).toBe("objevt_ping-checkpoint");
     expect(s.onReconnecting).toHaveBeenCalledWith(true);
     s.controller.abort();
     await running;
@@ -113,7 +136,7 @@ describe("conversation subscription", () => {
     const running = s.run();
     await vi.advanceTimersByTimeAsync(3000);
     expect(s.onEvent).toHaveBeenCalledExactlyOnceWith(event("objevt_e2"));
-    expect(s.streamEvents.mock.calls.map((call) => call[1].lastEventId)).toEqual([
+    expect(s.streamEvents.mock.calls.map((call) => call[2].lastEventId)).toEqual([
       "objevt_e1",
       "objevt_e1",
       "objevt_e1",
@@ -165,7 +188,7 @@ it("delivers heartbeats while keeping the durable cursor across EOF", async () =
   const running = s.run();
   await vi.advanceTimersByTimeAsync(1000);
   expect(s.onEvent).toHaveBeenCalledWith(heartbeat);
-  expect(s.streamEvents.mock.calls[1][1].lastEventId).toBe("objevt_e1");
+  expect(s.streamEvents.mock.calls[1][2].lastEventId).toBe("objevt_e1");
   s.controller.abort();
   await running;
 });
